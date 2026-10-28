@@ -11,8 +11,10 @@ calibration and are *not* comparable with Geekbench scores.
 ## Status — workload 2 of 16
 
 **File Compression** and **Navigation** are implemented (the first two
-Geekbench 6 CPU workloads). The full workload list and the roadmap live
-in [docs/benchmarks.md](docs/benchmarks.md).
+Geekbench 6 CPU workloads). The full workload list, the roadmap and the
+suggested landing order live in
+[docs/benchmarks.md](docs/benchmarks.md) and
+[ROADMAP.md](ROADMAP.md).
 
 - **File Compression** — compress and decompress a corpus with LZ4 at
   two compression ratios, verify every round-trip with SHA-1, score the
@@ -97,6 +99,22 @@ Multi-Core (12 threads, shared task)
   the result must also clear a straight-line lower bound); a broken
   search aborts instead of scoring.
 
+## Tests
+
+```sh
+make test
+```
+
+A dependency-free suite (no framework, same rules as the benchmark)
+covering 27 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+round-trips and format rejections, harness medians/scoring, and for
+each workload the determinism of its synthetic inputs, their documented
+invariants, golden pins on anything promised stable — and a
+differential test of Navigation's search against an independent full
+Dijkstra on every route. The suite is kept clean under
+`-fsanitize=address,undefined`; golden values are regenerated with
+`tools/gen_goldens.c` after deliberate format changes only.
+
 ## Repository layout
 
 ```
@@ -108,7 +126,10 @@ src/workload_navigation.[ch]  workload #2 — road grid, Dijkstra, verification
 src/lz4.[ch]                  LZ4 block-format codec (from scratch, 2 levels)
 src/sha1.[ch]                 SHA-1 for round-trip verification
 src/main.c                    CLI, suite order, output
+tests/                        the unit-test suite (make test)
+tools/gen_goldens.c           regenerates the golden pins of the tests
 docs/benchmarks.md            the workload list, methodology and scoring rules
+ROADMAP.md                    remaining workloads, cross-cutting plan, test rules
 ```
 
 ## License

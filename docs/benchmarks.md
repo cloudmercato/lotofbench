@@ -77,8 +77,8 @@ workload, dependency-free:
   "highways" (endpoints at least 256 units apart) run at 2.5× the base
   speed. The lattice alone guarantees connectivity; shortcuts and
   highways give the search real routing decisions. Roads are
-  bidirectional, stored as a directed CSR adjacency (~2.5 M directed
-  edges).
+  bidirectional, stored as a directed CSR adjacency (~1.26 M directed
+  edges; 1,259,432 on the default seed).
 - **Routes**: 64 seeded source/target pairs, straight-line distance
   between 300 and 700 grid units. Each route is an early-exit Dijkstra
   from its source: the search stops as soon as the target is settled.

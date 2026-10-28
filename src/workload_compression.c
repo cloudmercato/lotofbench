@@ -116,6 +116,16 @@ void fc_free(fc_ctx *ctx)
     free(ctx);
 }
 
+const uint8_t *fc_corpus(const fc_ctx *ctx)
+{
+    return ctx ? ctx->corpus : NULL;
+}
+
+size_t fc_len(const fc_ctx *ctx)
+{
+    return ctx ? ctx->len : 0;
+}
+
 /* One thread's slice of the corpus. */
 typedef struct {
     const uint8_t *src;

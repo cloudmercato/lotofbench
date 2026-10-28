@@ -30,4 +30,19 @@ void     nav_free(nav_ctx *ctx);
 int nav_run(nav_ctx *ctx, unsigned runs, unsigned *threads,
             double *throughput_medges, uint64_t *edges_relaxed);
 
+/* Read-only graph and route access for tests and tooling. */
+uint32_t        nav_nodes(const nav_ctx *ctx);      /* node count */
+uint32_t        nav_edge_count(const nav_ctx *ctx); /* directed edges */
+const uint32_t *nav_offsets(const nav_ctx *ctx);    /* nodes + 1 entries */
+const uint32_t *nav_dests(const nav_ctx *ctx);      /* edge_count entries */
+const uint32_t *nav_weights(const nav_ctx *ctx);    /* edge_count entries */
+
+/* Route i's endpoints; returns 0, or -1 when the index is out of range. */
+int nav_route_pair(const nav_ctx *ctx, unsigned route, uint32_t *src,
+                   uint32_t *dst);
+
+/* Settled travel time of route i, computed by the workload's own search
+ * (early-exit Dijkstra + verification). Returns 0, or -1 on failure. */
+int nav_route_time(nav_ctx *ctx, unsigned route, uint64_t *time_out);
+
 #endif /* WORKLOAD_NAVIGATION_H */

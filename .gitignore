@@ -1,3 +1,5 @@
 /build/
 lotofbench
+tests/lotofbench_test
+tools/gen_goldens
 *.o

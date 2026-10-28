@@ -24,4 +24,8 @@ void    fc_free(fc_ctx *ctx);
 int fc_run(fc_ctx *ctx, unsigned runs, unsigned *threads,
            double *throughput_mbps);
 
+/* Read-only corpus access for tests and tooling. */
+const uint8_t *fc_corpus(const fc_ctx *ctx);
+size_t         fc_len(const fc_ctx *ctx);
+
 #endif /* WORKLOAD_COMPRESSION_H */

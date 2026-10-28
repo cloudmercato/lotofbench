@@ -248,6 +248,30 @@ typedef struct {
     size_t route_begin, route_end;
 } nav_slice;
 
+static void slice_free(nav_slice *s)
+{
+    free(s->dist);
+    free(s->parent);
+    free(s->pos);
+    free(s->heap_id);
+    memset(s, 0, sizeof(*s));
+}
+
+static int slice_alloc(nav_slice *s, const nav_ctx *g)
+{
+    memset(s, 0, sizeof(*s));
+    s->g = g;
+    s->dist = malloc((size_t)g->nodes * sizeof(*s->dist));
+    s->parent = malloc((size_t)g->nodes * sizeof(*s->parent));
+    s->pos = malloc((size_t)g->nodes * sizeof(*s->pos));
+    s->heap_id = malloc((size_t)g->nodes * sizeof(*s->heap_id));
+    if (!s->dist || !s->parent || !s->pos || !s->heap_id) {
+        slice_free(s);
+        return -1;
+    }
+    return 0;
+}
+
 /* Indexed binary min-heap: decrease-key instead of lazy deletion keeps
  * the heap bounded by the node count and the sift counts honest. */
 
@@ -426,19 +450,13 @@ int nav_run(nav_ctx *ctx, unsigned runs, unsigned *threads,
 
     for (unsigned t = 0; t < t_count; t++) {
         size_t count = per_route + (t < extra ? 1u : 0u);
-        nav_slice *s = &slices[t];
 
-        s->g = ctx;
-        s->dist = malloc((size_t)ctx->nodes * sizeof(*s->dist));
-        s->parent = malloc((size_t)ctx->nodes * sizeof(*s->parent));
-        s->pos = malloc((size_t)ctx->nodes * sizeof(*s->pos));
-        s->heap_id = malloc((size_t)ctx->nodes * sizeof(*s->heap_id));
-        if (!s->dist || !s->parent || !s->pos || !s->heap_id)
+        if (slice_alloc(&slices[t], ctx) != 0)
             goto out;
-        s->route_begin = begin;
-        s->route_end = begin + count;
+        slices[t].route_begin = begin;
+        slices[t].route_end = begin + count;
         begin += count;
-        ctxs[t] = s;
+        ctxs[t] = &slices[t];
     }
 
     rc = harness_run(t_count, runs, nav_cycle, ctxs, elapsed);
@@ -456,13 +474,67 @@ int nav_run(nav_ctx *ctx, unsigned runs, unsigned *threads,
 
 out:
     if (slices)
-        for (unsigned t = 0; t < t_count; t++) {
-            free(slices[t].dist);
-            free(slices[t].parent);
-            free(slices[t].pos);
-            free(slices[t].heap_id);
-        }
+        for (unsigned t = 0; t < t_count; t++)
+            slice_free(&slices[t]);
     free(slices);
     free(ctxs);
+    return rc;
+}
+
+/* --- read-only access for tests and tooling ---------------------------------*/
+
+uint32_t nav_nodes(const nav_ctx *ctx)
+{
+    return ctx ? ctx->nodes : 0;
+}
+
+uint32_t nav_edge_count(const nav_ctx *ctx)
+{
+    return ctx ? ctx->edge_count : 0;
+}
+
+const uint32_t *nav_offsets(const nav_ctx *ctx)
+{
+    return ctx ? ctx->off : NULL;
+}
+
+const uint32_t *nav_dests(const nav_ctx *ctx)
+{
+    return ctx ? ctx->dst : NULL;
+}
+
+const uint32_t *nav_weights(const nav_ctx *ctx)
+{
+    return ctx ? ctx->w : NULL;
+}
+
+int nav_route_pair(const nav_ctx *ctx, unsigned route, uint32_t *src,
+                   uint32_t *dst)
+{
+    if (!ctx || route >= NAV_ROUTES)
+        return -1;
+    if (src)
+        *src = ctx->route_src[route];
+    if (dst)
+        *dst = ctx->route_dst[route];
+    return 0;
+}
+
+int nav_route_time(nav_ctx *ctx, unsigned route, uint64_t *time_out)
+{
+    nav_slice s;
+    uint32_t src, dst;
+    int rc;
+
+    if (!ctx || route >= NAV_ROUTES || !time_out)
+        return -1;
+    if (nav_route_pair(ctx, route, &src, &dst) != 0)
+        return -1;
+    if (slice_alloc(&s, ctx) != 0)
+        return -1;
+    rc = nav_route(&s, src, dst);
+    if (rc == 0)
+        *time_out = s.dist[dst];
+    slice_free(&s);
     return rc;
 }
