@@ -30,7 +30,7 @@ jobs:
               -H "Authorization: token $GITEA_TOKEN" -H 'Content-Type: application/json' \
               -d "$payload")
             case "$code" in
-              200|204)
+              200|201|204)
                 echo "Auto-merge scheduled (HTTP $code)"; exit 0 ;;
               409)
                 echo "Already scheduled (HTTP 409, desired state exists)"; exit 0 ;;
