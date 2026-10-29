@@ -49,7 +49,7 @@ the same grouping once it aggregates (see Composite scoring).
 | 3 | HTML5 Browser | HTML parse, CSS layout, render | Dependency-free tokenizer → block layout → scanline "render" over a synthetic DOM tree; metric pages/s or elements/s; verify the rendered pixmap hash |
 | 4 | PDF Render | PDFium vector rendering | Synthetic vector scene list → bezier flattening, scanline polygon fill, anti-aliasing; metric Mpixels/s; verify pixel hash |
 | 5 | Photo Library | JPEG decode, thumbnails, MobileNet classify + SQLite | Synthetic images → box-filter thumbnails + a tiny fixed conv pass + an in-memory record store; metric images/s |
-| 6 | Clang | Compiling the Lua interpreter | Lexer/parser/codegen of a small deterministic language subset (no system cc — that would break reproducibility); metric Ktokens/s; verify emitted bytes hash |
+| 6 | Clang | Compiling the Lua interpreter | Lexer/parser/codegen of a small deterministic language subset (no system cc — that would break reproducibility); metric Ktokens/s; verify emitted bytes hash — **implemented v0.4** |
 | 7 | Text Processing | Regex parsing, Markdown→HTML | From-scratch regex engine (NFA or backtracking) + Markdown→HTML subset over synthetic texts; metric MB/s |
 | 8 | Asset Compression | ASTC/BC7/DXT5 texture codecs, Draco mesh | From-scratch BC1-style block codec over synthetic textures + simple mesh quantization; metric Mpixels/s |
 

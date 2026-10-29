@@ -55,6 +55,17 @@ static const test_entry TESTS[] = {
     { "html5/run-sane", test_h5_run_sane },
     { "html5/thread-clamp", test_h5_thread_clamp },
     { "html5/null-accessors", test_h5_accessors_null_safe },
+    /* workload #6 — clang */
+    { "clang/units-deterministic", test_cl_units_deterministic },
+    { "clang/input-invariants", test_cl_input_invariants },
+    { "clang/lexer-units", test_cl_lexer_units },
+    { "clang/parser-units", test_cl_parser_units },
+    { "clang/codegen-golden", test_cl_codegen_golden },
+    { "clang/stack-discipline", test_cl_stack_discipline },
+    { "clang/run-sane", test_cl_run_sane },
+    { "clang/thread-clamp", test_cl_thread_clamp },
+    { "clang/null-accessors", test_cl_accessors_null_safe },
+    { "clang/golden", test_cl_golden },
 };
 
 int main(void)

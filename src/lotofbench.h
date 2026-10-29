@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.3.0"
+#define LOTOFBENCH_VERSION   "0.4.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -17,6 +17,8 @@
 #define NAV_WORKLOAD_SLUG    "navigation"
 #define HTML5_WORKLOAD_NAME  "HTML5 Browser"
 #define HTML5_WORKLOAD_SLUG  "html5-browser"
+#define CL_WORKLOAD_NAME     "Clang"
+#define CL_WORKLOAD_SLUG     "clang"
 
 /* Suite and harness defaults — all overridable on the command line
  * (except the thread cap). */
@@ -46,6 +48,11 @@
  * machine renders 650 pages per second — about 1.5 milliseconds per
  * page, a round and honest yardstick. */
 #define BASELINE_HTML5BROWSER_PPS     650.0
+
+/* Workload #6 — Clang: thousands of source tokens compiled per second
+ * (lexed, parsed and emitted as bytecode). The 1000-point reference
+ * machine compiles about 8.5 million tokens per second. */
+#define BASELINE_CLANG_KTOKENS        8500.0
 
 /* One published workload result (single- or multi-core). */
 typedef struct {

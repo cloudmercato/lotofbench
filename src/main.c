@@ -10,6 +10,7 @@
 
 #include "harness.h"
 #include "lotofbench.h"
+#include "workload_clang.h"
 #include "workload_compression.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
@@ -113,6 +114,18 @@ static int run_h5(html5_ctx *h5, unsigned runs, unsigned threads_req,
     return 0;
 }
 
+static int run_cl(cl_ctx *cl, unsigned runs, unsigned threads_req,
+                  lb_result *out, uint64_t *tokens)
+{
+    unsigned t = threads_req;
+
+    if (cl_run(cl, runs, &t, &out->throughput, tokens) != 0)
+        return -1;
+    out->threads = t;
+    out->score = lb_score(out->throughput, BASELINE_CLANG_KTOKENS);
+    return 0;
+}
+
 /* --- output ------------------------------------------------------------------*/
 
 static void print_block(const char *unit, double baseline,
@@ -133,7 +146,8 @@ static void print_json(const options *opt, const lb_result *fc_single,
                        const lb_result *nav_multi, uint64_t nav_ops,
                        const lb_result *h5_single,
                        const lb_result *h5_multi, uint64_t h5_pages,
-                       uint64_t h5_elements)
+                       uint64_t h5_elements, const lb_result *cl_single,
+                       const lb_result *cl_multi, uint64_t cl_tokens)
 {
     printf("{\n");
     printf("  \"benchmark\": \"lotofbench\",\n");
@@ -170,8 +184,18 @@ static void print_json(const options *opt, const lb_result *fc_single,
            "\"score\": %ld},\n",
            h5_single->threads, h5_single->throughput, h5_single->score);
     printf("     \"multi\": {\"threads\": %u, \"throughput_pps\": %.1f, "
-           "\"score\": %ld}}\n",
+           "\"score\": %ld}},\n",
            h5_multi->threads, h5_multi->throughput, h5_multi->score);
+    printf("    {\"name\": \"%s\", \"units\": %u, \"tokens\": %llu, "
+           "\"baseline_ktokens\": %.1f,\n",
+           CL_WORKLOAD_SLUG, CLANG_UNITS, (unsigned long long)cl_tokens,
+           BASELINE_CLANG_KTOKENS);
+    printf("     \"single\": {\"threads\": %u, \"throughput_ktokens\": %.1f, "
+           "\"score\": %ld},\n",
+           cl_single->threads, cl_single->throughput, cl_single->score);
+    printf("     \"multi\": {\"threads\": %u, \"throughput_ktokens\": %.1f, "
+           "\"score\": %ld}}\n",
+           cl_multi->threads, cl_multi->throughput, cl_multi->score);
     printf("  ]\n");
     printf("}\n");
 }
@@ -182,41 +206,47 @@ int main(int argc, char **argv)
     fc_ctx *fc = fc_prepare(opt.corpus_mb, opt.seed);
     nav_ctx *nav = nav_prepare(opt.seed);
     html5_ctx *h5 = html5_prepare(opt.seed);
+    cl_ctx *cl = cl_prepare(opt.seed);
 
-    if (!fc || !nav || !h5) {
+    if (!fc || !nav || !h5 || !cl) {
         fprintf(stderr,
                 "lotofbench: out of memory building the workload inputs\n");
         fc_free(fc);
         nav_free(nav);
         html5_free(h5);
+        cl_free(cl);
         return 1;
     }
 
     lb_result fc_single = { 0, 0.0, 0 }, fc_multi = { 0, 0.0, 0 };
     lb_result nav_single = { 0, 0.0, 0 }, nav_multi = { 0, 0.0, 0 };
     lb_result h5_single = { 0, 0.0, 0 }, h5_multi = { 0, 0.0, 0 };
-    uint64_t nav_ops = 0, h5_pages = 0;
+    lb_result cl_single = { 0, 0.0, 0 }, cl_multi = { 0, 0.0, 0 };
+    uint64_t nav_ops = 0, h5_pages = 0, cl_tokens = 0;
 
     if (run_fc(fc, opt.runs, 1, &fc_single) != 0 ||
         run_fc(fc, opt.runs, opt.threads, &fc_multi) != 0 ||
         run_nav(nav, opt.runs, 1, &nav_single, &nav_ops) != 0 ||
         run_nav(nav, opt.runs, opt.threads, &nav_multi, &nav_ops) != 0 ||
         run_h5(h5, opt.runs, 1, &h5_single, &h5_pages) != 0 ||
-        run_h5(h5, opt.runs, opt.threads, &h5_multi, &h5_pages) != 0) {
+        run_h5(h5, opt.runs, opt.threads, &h5_multi, &h5_pages) != 0 ||
+        run_cl(cl, opt.runs, 1, &cl_single, &cl_tokens) != 0 ||
+        run_cl(cl, opt.runs, opt.threads, &cl_multi, &cl_tokens) != 0) {
         fprintf(stderr,
                 "lotofbench: workload failed — a result did not verify\n");
         fc_free(fc);
         nav_free(nav);
         html5_free(h5);
+        cl_free(cl);
         return 1;
     }
 
     if (opt.json) {
         print_json(&opt, &fc_single, &fc_multi, &nav_single, &nav_multi,
                    nav_ops, &h5_single, &h5_multi, h5_pages,
-                   html5_elements(h5));
+                   html5_elements(h5), &cl_single, &cl_multi, cl_tokens);
     } else {
-        char fc_cfg[64], nav_cfg[64], h5_cfg[64];
+        char fc_cfg[64], nav_cfg[64], h5_cfg[64], cl_cfg[64];
 
         snprintf(fc_cfg, sizeof(fc_cfg), "corpus %u MB synthetic",
                  opt.corpus_mb);
@@ -225,6 +255,8 @@ int main(int argc, char **argv)
         snprintf(h5_cfg, sizeof(h5_cfg), "%u pages, %llux%llu viewport",
                  HTML5_PAGES, (unsigned long long)HTML5_VIEW_W,
                  (unsigned long long)HTML5_VIEW_H);
+        snprintf(cl_cfg, sizeof(cl_cfg), "%u units, %llu source tokens",
+                 CLANG_UNITS, (unsigned long long)cl_tokens);
 
         printf("LotofBench %s\n", LOTOFBENCH_VERSION);
         printf("seed %u, %u runs, median\n\n", opt.seed, opt.runs);
@@ -238,10 +270,14 @@ int main(int argc, char **argv)
                h5_cfg, (unsigned long long)html5_elements(h5));
         print_block("pages/s", BASELINE_HTML5BROWSER_PPS, &h5_single,
                     &h5_multi);
+        printf("\n%s (%s)\n", CL_WORKLOAD_NAME, cl_cfg);
+        print_block("Ktokens/s", BASELINE_CLANG_KTOKENS, &cl_single,
+                    &cl_multi);
     }
 
     fc_free(fc);
     nav_free(nav);
     html5_free(h5);
+    cl_free(cl);
     return 0;
 }

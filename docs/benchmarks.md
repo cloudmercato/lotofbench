@@ -20,7 +20,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 3 | HTML5 Browser                 | HTML parse, CSS layout, render     | **implemented v0.3** |
 | 4 | PDF Render                    | Vector PDF rendering (PDFium)      | planned |
 | 5 | Photo Library                 | JPEG decode, thumbnails, MobileNet classify + SQLite | planned |
-| 6 | Clang                         | Compiling the Lua interpreter      | planned |
+| 6 | Clang                         | Compiling the Lua interpreter      | **implemented v0.4** |
 | 7 | Text Processing               | Regex parsing, Markdown→HTML (Python) | planned |
 | 8 | Asset Compression             | ASTC/BC7/DXT5 texture codecs, Draco mesh | planned |
 | 9 | Object Detection              | MobileNet v1 SSD over photos       | planned |
@@ -146,6 +146,49 @@ cascade, floats or flexbox), a bitmap font instead of hinted TrueType,
 procedural images instead of JPEG/PNG decode, 800×600 instead of
 1280×720.
 
+## Workload 6 — Clang (implemented)
+
+Geekbench 6's Clang workload compiles the Lua interpreter sources with
+Clang (-O2, to LLVM bitcode). A system compiler cannot be part of a
+reproducible benchmark — machine-dependent binaries, version-dependent
+codegen — so LotofBench v0.4 reproduces the *shape* of that workload,
+dependency-free, with the same honesty rules as the other workloads:
+
+- **Translation units**: 32 seeded synthetic sources (a Lua-flavoured
+  subset: locals and globals, arithmetic and string concat, table
+  constructors, field/index access, `if`/`while`/`repeat`/`for` with
+  `break`, function definitions and calls, `and`/`or`). Six archetype
+  families cycle — call graphs, table building, arithmetic kernels,
+  string handling, control flow, mixed modules. Sources are generated
+  off the clock (the stand-in for checking out the project); a fixed
+  seed means byte-identical sources on every machine.
+- **Lexer**: hand-rolled — names, decimal integer literals, string
+  literals with escapes, every operator of the subset (no floats: a
+  digit run followed by `.` is a lexer error).
+- **Parser**: recursive descent with the Lua precedence chain (or <
+  and < comparisons < concat < additive < multiplicative, concat
+  right-associative), building a flat arena AST.
+- **Code generator**: stack-machine bytecode — every proto serializes
+  to a byte blob (header, constant table, instruction stream, nested
+  child protos). Instructions are 4 bytes: opcode, `a`, `b` (u16 LE);
+  jumps carry absolute instruction indices and are fixed up on patch;
+  short-circuit `and`/`or` compile to DUP + JZ/JNZ-to-consumer + POP.
+- **Verification**: inside the timed cycle, every unit is lexed,
+  parsed and compiled from scratch, and the emitted bytes are checked
+  against an off-clock reference compilation of the same source:
+  the SHA-1 of the bytecode blob must match exactly. A lexer, parser
+  or codegen drift aborts the run.
+- **Cycle**: one run = the whole unit set (full pipeline on all 32
+  units), timed as a whole with `CLOCK_MONOTONIC`. The corpus is about
+  960k tokens, and a single-core pass takes 150–250 ms on the reference
+  machine — long enough to mean something, short enough for many runs.
+
+Known v0.4 divergences from Geekbench 6, all deliberate: a synthetic
+Lua-subset corpus instead of the real Lua sources, a from-scratch
+bytecode compiler instead of Clang/LLVM (a system compiler would make
+scores version- and flag-dependent), and blob hashing instead of
+object-file emission.
+
 ## Metric
 
 Each run reports a **throughput**, and the workload result is the
@@ -166,6 +209,13 @@ Each run reports a **throughput**, and the workload result is the
   of the full page set, in pages per second. A page "render" is the
   whole pipeline (parse + layout + raster), so the unit is honest at
   the workload level even though it compresses three distinct stages.
+- **Clang** — source tokens compiled divided by the wall-clock seconds
+  of the full unit set, in decimal thousands of tokens per second
+  (Ktokens/s). A "token compiled" is one lexer token carried through
+  the whole pipeline (lex + parse + codegen + verify); the count is
+  exact and deterministic (same seed, same count), so it is the Clang
+  analogue of the corpus size. On the default seed the suite compiles
+  986,328 tokens per pass.
 
 ## Scoring
 
@@ -179,7 +229,7 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with three
+will adopt the same aggregation once more workloads exist; with four
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
@@ -189,12 +239,15 @@ publishes its own score.
 - `BASELINE_HTML5BROWSER_PPS` = **650.0 pages/s** = 1000 (workload #3)
   — the reference machine renders a page (parse + layout + raster of
   an 800×600 viewport) in about 1.5 milliseconds.
+- `BASELINE_CLANG_KTOKENS` = **8500.0 Ktokens/s** = 1000 (workload #6)
+  — the reference machine compiles about 8.5 million source tokens per
+  second (lex + parse + codegen + verify).
 
 ## Multi-core model
 
 Geekbench 6 moved to a **shared task** model: threads cooperate on one
 task, each handling a slice, instead of running independent copies.
-LotofBench does the same for all three workloads:
+LotofBench does the same for every workload:
 
 - **File Compression** — the corpus is split into equal 64-byte-aligned
   chunks, one per thread.
@@ -203,6 +256,9 @@ LotofBench does the same for all three workloads:
 - **HTML5 Browser** — the page set is split into equal contiguous
   slices, one per thread; each thread tokenizes, lays out and rasters
   its pages, and verifies them against the reference render.
+- **Clang** — the unit set is split into equal contiguous slices, one
+  per thread; each thread lexes, parses, compiles and verifies its
+  units against the reference blobs.
 
 Runs are synchronised through a start gate (every thread must be ready
 before the clock starts, and the clock stops when the last thread

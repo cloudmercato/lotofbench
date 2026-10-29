@@ -19,6 +19,7 @@
 #include "lz4.h"
 #include "rng.h"
 #include "sha1.h"
+#include "workload_clang.h"
 #include "workload_compression.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
@@ -108,5 +109,26 @@ int main(void)
         printf("\nHTML5_SEED1_PAGE%u_PIX_SHA1 %s", p, hex);
     }
     html5_free(h5);
+
+    /* clang goldens (seed 1): unit 0 (call-graph archetype) source and
+     * bytecode, and the corpus token total */
+    cl_ctx *cl = cl_prepare(1);
+    size_t blob_len = 0;
+
+    if (!cl)
+        return 1;
+    sha1_hex((const uint8_t *)cl_unit_source(cl, 0),
+             cl_unit_source_len(cl, 0), hex);
+    printf("\nCLANG_SEED1_UNIT0_SRC_SHA1 %s len=%zu tokens=%llu nodes=%llu",
+           hex, cl_unit_source_len(cl, 0),
+           (unsigned long long)cl_unit_tokens(cl, 0),
+           (unsigned long long)cl_unit_nodes(cl, 0));
+    const uint8_t *blob = cl_unit_blob(cl, 0, &blob_len);
+
+    sha1_hex(blob, blob_len, hex);
+    printf("\nCLANG_SEED1_UNIT0_BLOB_SHA1 %s len=%zu", hex, blob_len);
+    printf("\nCLANG_SEED1_TOTAL_TOKENS %llu",
+           (unsigned long long)cl_tokens(cl));
+    cl_free(cl);
     return 0;
 }

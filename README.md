@@ -8,10 +8,10 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 3 of 16
+## Status — workload 4 of 16
 
-**File Compression**, **Navigation** and **HTML5 Browser** are
-implemented (the first three Geekbench 6 CPU workloads). The full
+**File Compression**, **Navigation**, **HTML5 Browser** and **Clang**
+are implemented (four of the Geekbench 6 CPU workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
@@ -27,6 +27,10 @@ workload list, the roadmap and the suggested landing order live in
   pages (six site archetypes) into an 800×600 framebuffer with a
   hand-rolled tokenizer, block layout and scanline rasterizer, verify
   every render, score the page rate.
+- **Clang** — lex, parse and compile 32 seeded synthetic translation
+  units (a Lua-flavoured subset, six archetype families) to bytecode
+  with a from-scratch lexer, recursive-descent parser and code
+  generator, verify every emitted blob, score the token rate.
 
 ## Build (one command)
 
@@ -156,6 +160,7 @@ src/harness.[ch]              shared-task threading: start gate, timing, median
 src/workload_compression.[ch] workload #1 — corpus, LZ4 cycles, SHA-1 verify
 src/workload_navigation.[ch]  workload #2 — road grid, Dijkstra, verification
 src/workload_html5browser.[ch] workload #3 — pages, tokenizer, layout, raster
+src/workload_clang.[ch]       workload #6 — units, lexer, parser, codegen
 src/lz4.[ch]                  LZ4 block-format codec (from scratch, 2 levels)
 src/sha1.[ch]                 SHA-1 for round-trip verification
 src/main.c                    CLI, suite order, output

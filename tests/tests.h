@@ -102,4 +102,16 @@ void test_h5_run_sane(void);
 void test_h5_thread_clamp(void);
 void test_h5_accessors_null_safe(void);
 
+/* --- workload #6: clang -----------------------------------------------------------------*/
+void test_cl_units_deterministic(void);
+void test_cl_input_invariants(void);
+void test_cl_lexer_units(void);
+void test_cl_parser_units(void);
+void test_cl_codegen_golden(void);
+void test_cl_stack_discipline(void);
+void test_cl_run_sane(void);
+void test_cl_thread_clamp(void);
+void test_cl_accessors_null_safe(void);
+void test_cl_golden(void);
+
 #endif /* LOTOFBENCH_TESTS_H */
