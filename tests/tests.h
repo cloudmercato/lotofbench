@@ -114,4 +114,14 @@ void test_cl_thread_clamp(void);
 void test_cl_accessors_null_safe(void);
 void test_cl_golden(void);
 
+/* --- workload #7: text processing --------------------------------------------------------*/
+void test_tp_corpus_deterministic(void);
+void test_tp_input_invariants(void);
+void test_tp_regex_semantics(void);
+void test_tp_markdown_units(void);
+void test_tp_thread_clamp(void);
+void test_tp_run_sane(void);
+void test_tp_accessors_null_safe(void);
+void test_tp_golden(void);
+
 #endif /* LOTOFBENCH_TESTS_H */

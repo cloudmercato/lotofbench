@@ -1,1 +1,19 @@
-{"0": "Core Headers & Compression", "1": "Navigation Routing", "2": "Harness Timing", "3": "Navigation Tests", "4": "CLI & Reporting", "5": "LZ4 Codec", "6": "RNG Engine", "7": "Frequency Corpus", "8": "Nav CSR Graph", "9": "SHA-1 Hashing", "10": "Reference Heap"}
+{
+  "0": "tests.h",
+  "1": "workload_navigation.c",
+  "2": "harness.c",
+  "3": "test_workload_clang.c",
+  "4": "main.c",
+  "5": "lz4.c",
+  "6": "workload_clang.c",
+  "7": "fc_prepare",
+  "8": "workload_html5browser.c",
+  "9": "string",
+  "10": "cl_scratch",
+  "11": "Benchmarks",
+  "12": "gen_page",
+  "13": "gen_goldens.c",
+  "14": "workload_compression.c",
+  "15": "workload_textprocessing.c",
+  "16": "main"
+}

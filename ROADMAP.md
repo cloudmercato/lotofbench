@@ -24,16 +24,14 @@ list and implementation status live in
 
 ## Suggested landing order
 
-1. **#7 Text Processing** — regex engine + Markdown→HTML subset. Pure
-   integer work, self-contained, no codecs or numerics to build first.
-2. **#13 Photo Filter** — blur, color, crop, scale over synthetic
+1. **#13 Photo Filter** — blur, color, crop, scale over synthetic
    images; establishes the deterministic image helpers every later
    image workload reuses.
-3. **#12 Horizon Detection** — Canny + Hough, with synthetic
+2. **#12 Horizon Detection** — Canny + Hough, with synthetic
    ground-truth horizons to verify against.
-4. **#15 Ray Tracer** — Whitted-style tracer + BVH over a synthetic
+3. **#15 Ray Tracer** — Whitted-style tracer + BVH over a synthetic
    scene; the flagship floating-point workload.
-5. **#4 PDF Render** — scanline rasterizer over synthetic vector
+4. **#4 PDF Render** — scanline rasterizer over synthetic vector
    scenes (bezier flattening, polygon fill, anti-aliasing).
 
 ## The remaining Geekbench 6 CPU workloads
@@ -50,7 +48,7 @@ the same grouping once it aggregates (see Composite scoring).
 | 4 | PDF Render | PDFium vector rendering | Synthetic vector scene list → bezier flattening, scanline polygon fill, anti-aliasing; metric Mpixels/s; verify pixel hash |
 | 5 | Photo Library | JPEG decode, thumbnails, MobileNet classify + SQLite | Synthetic images → box-filter thumbnails + a tiny fixed conv pass + an in-memory record store; metric images/s |
 | 6 | Clang | Compiling the Lua interpreter | Lexer/parser/codegen of a small deterministic language subset (no system cc — that would break reproducibility); metric Ktokens/s; verify emitted bytes hash — **implemented v0.4** |
-| 7 | Text Processing | Regex parsing, Markdown→HTML | From-scratch regex engine (NFA or backtracking) + Markdown→HTML subset over synthetic texts; metric MB/s |
+| 7 | Text Processing | Regex parsing, Markdown→HTML | From-scratch regex engine (NFA or backtracking) + Markdown→HTML subset over synthetic texts; metric MB/s — **implemented v0.5** |
 | 8 | Asset Compression | ASTC/BC7/DXT5 texture codecs, Draco mesh | From-scratch BC1-style block codec over synthetic textures + simple mesh quantization; metric Mpixels/s |
 
 ### Floating-Point section

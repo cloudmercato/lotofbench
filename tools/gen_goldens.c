@@ -23,6 +23,7 @@
 #include "workload_compression.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
+#include "workload_textprocessing.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -130,5 +131,26 @@ int main(void)
     printf("\nCLANG_SEED1_TOTAL_TOKENS %llu",
            (unsigned long long)cl_tokens(cl));
     cl_free(cl);
+
+    /* textprocessing goldens (seed 1): document 0 (API-doc archetype)
+     * source and HTML, its first pattern and reference match count,
+     * and the corpus task size */
+    tp_ctx *tpw = tp_prepare(1);
+
+    if (!tpw)
+        return 1;
+    sha1_hex((const uint8_t *)tp_doc_source(tpw, 0), tp_doc_len(tpw, 0),
+             hex);
+    printf("\nTP_SEED1_DOC0_SRC_SHA1 %s len=%llu", hex,
+           (unsigned long long)tp_doc_len(tpw, 0));
+    sha1_hex((const uint8_t *)tp_doc_html(tpw, 0),
+             tp_doc_html_len(tpw, 0), hex);
+    printf("\nTP_SEED1_DOC0_HTML_SHA1 %s len=%zu", hex,
+           tp_doc_html_len(tpw, 0));
+    printf("\nTP_SEED1_DOC0_P0 %s matches=%u",
+           tp_doc_pattern(tpw, 0, 0), tp_doc_matches(tpw, 0, 0));
+    printf("\nTP_SEED1_TASK_BYTES %llu",
+           (unsigned long long)tp_bytes(tpw));
+    tp_free(tpw);
     return 0;
 }
