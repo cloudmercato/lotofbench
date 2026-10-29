@@ -13,6 +13,8 @@
 #include "rng.h"
 #include "sha1.h"
 
+#include <errno.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -159,4 +161,62 @@ void test_lz4_rejects_malformed(void)
 
     /* Unknown compression level. */
     CHECK_U64(lz4_compress(src, sizeof src, comp, 3), 0);
+}
+
+/* --- regression: the codec must survive a 128 KiB thread stack ---------- */
+
+/* lz4_compress() used to place its 256 KiB hash table and the 128 KiB
+ * high-level chain on the caller's stack. glibc threads (8 MiB default)
+ * never noticed, but musl gives every pthread a 128 KiB stack — the
+ * default in alpine/scratch containers — so the first multi-core run in
+ * such a container segfaulted before doing any work. The tables are
+ * _Thread_local now; this test pins the contract: the codec works in a
+ * worker thread with a 128 KiB stack, the smallest stack we run on. */
+
+#define TINY_STACK_BYTES (128u * 1024u)
+
+static void *tiny_stack_worker(void *arg)
+{
+    int *status = arg;
+    static const size_t n = 65536; /* past MF_LIMIT: the match loop and
+                                    * the high-level chain really run */
+    uint8_t *src = malloc(n);
+    rng_t r;
+
+    if (!src) {
+        *status = -1;
+        return NULL;
+    }
+    /* Half repeated bytes (long matches), half PRNG (literals): both
+     * encoder paths in one round-trip, at both levels. */
+    memset(src, 'a', n / 2);
+    rng_init(&r, 20261029);
+    for (size_t i = n / 2; i < n; i++)
+        src[i] = (uint8_t)rng_next(&r);
+    *status = roundtrip_ok(src, n);
+    free(src);
+    return NULL;
+}
+
+void test_lz4_small_thread_stack(void)
+{
+    pthread_attr_t attr;
+    pthread_t t;
+    int status = -1;
+
+    CHECK(pthread_attr_init(&attr) == 0);
+    CHECK(pthread_attr_setstacksize(&attr, TINY_STACK_BYTES) == 0);
+    /* pthread functions report errors via the return value, not errno. */
+    int rc = pthread_create(&t, &attr, tiny_stack_worker, &status);
+    if (rc != 0) {
+        test_fail(__FILE__, __LINE__,
+                  "pthread_create(%u KiB stack): %s",
+                  TINY_STACK_BYTES / 1024u, strerror(rc));
+        return;
+    }
+    pthread_join(t, NULL);
+    if (status != 0)
+        test_fail(__FILE__, __LINE__,
+                  "round-trip failed in a 128 KiB-stack thread (musl "
+                  "worker stacks are this small)");
 }

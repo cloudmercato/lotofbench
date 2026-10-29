@@ -23,6 +23,7 @@ static const test_entry TESTS[] = {
     { "lz4/golden-blocks", test_lz4_golden_vectors },
     { "lz4/incompressible-overhead", test_lz4_incompressible_overhead },
     { "lz4/rejects-malformed", test_lz4_rejects_malformed },
+    { "lz4/small-thread-stack", test_lz4_small_thread_stack },
     /* harness */
     { "harness/median", test_median_odd_even },
     { "harness/score-rounding", test_score_rounding },

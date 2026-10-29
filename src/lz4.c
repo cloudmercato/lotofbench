@@ -13,6 +13,8 @@
 
 #include "lz4.h"
 
+#include <pthread.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define MINMATCH         4
@@ -99,25 +101,68 @@ static size_t emit_last_literals(const uint8_t *src, size_t len,
     return op;
 }
 
+/* --- per-thread encoder scratch ---------------------------------------- */
+
+/* The hash table (256 KB) and the high-level chain (128 KB) cannot live
+ * on the stack: musl gives worker threads a 128 KB stack, and the first
+ * multi-core run in an alpine/scratch container segfaulted before doing
+ * any work. They cannot be plain _Thread_local arrays either: glibc
+ * must fit the whole static TLS block inside the thread stack, so 384
+ * KB of TLS makes pthread_create fail with EINVAL for any stack below
+ * ~512 KB. One heap allocation per thread behind an 8-byte TLS pointer
+ * keeps the codec usable from any sane thread with no per-call cost;
+ * the pthread_key destructor gives it back at thread exit. */
+typedef struct {
+    uint32_t table[HASH_SIZE];
+    uint16_t chain[1u << 16];
+} lz4_scratch;
+
+static void lz4_scratch_destroy(void *p)
+{
+    free(p);
+}
+
+static pthread_key_t lz4_scratch_key;
+static pthread_once_t lz4_scratch_once = PTHREAD_ONCE_INIT;
+
+static void lz4_scratch_key_create(void)
+{
+    pthread_key_create(&lz4_scratch_key, lz4_scratch_destroy);
+}
+
+static lz4_scratch *lz4_scratch_get(void)
+{
+    lz4_scratch *s;
+
+    pthread_once(&lz4_scratch_once, lz4_scratch_key_create);
+    s = pthread_getspecific(lz4_scratch_key);
+    if (!s) {
+        s = malloc(sizeof *s);
+        if (!s)
+            return NULL;
+        pthread_setspecific(lz4_scratch_key, s);
+    }
+    return s;
+}
+
 size_t lz4_compress(const uint8_t *src, size_t src_len, uint8_t *out,
                     int level)
 {
-    /* Worker threads may only get a 128 KB stack under musl, so the
-     * hash table (256 KB) and the high-level chain (128 KB) cannot live
-     * on the stack. _Thread_local keeps one private copy per thread:
-     * no data race in multi-core runs, no API change. */
-    static _Thread_local uint32_t table[HASH_SIZE];
-    static _Thread_local uint16_t chain[1u << 16];
+    lz4_scratch *scratch = lz4_scratch_get();
     const int chained = (level == LZ4_LEVEL_HIGH);
     const size_t bound = lz4_compress_bound(src_len);
     size_t ip = 0, anchor = 0, op = 0;
+    uint32_t *table;
+    uint16_t *chain;
 
-    if (src_len > MAX_BLOCK_SIZE || (level != LZ4_LEVEL_FAST &&
-                                     level != LZ4_LEVEL_HIGH))
+    if (!scratch || src_len > MAX_BLOCK_SIZE ||
+        (level != LZ4_LEVEL_FAST && level != LZ4_LEVEL_HIGH))
         return 0;
+    table = scratch->table;
+    chain = scratch->chain;
 
-    memset(table, 0xFF, sizeof(table)); /* NO_POS everywhere */
-    memset(chain, 0, sizeof(chain));
+    memset(table, 0xFF, sizeof scratch->table); /* NO_POS everywhere */
+    memset(chain, 0, sizeof scratch->chain);
 
     /* Too short to hold a match plus the mandatory literal tail. */
     if (src_len < MF_LIMIT + MINMATCH)
