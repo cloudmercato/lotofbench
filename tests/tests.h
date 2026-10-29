@@ -66,6 +66,7 @@ void test_lz4_roundtrip_shapes(void);
 void test_lz4_golden_vectors(void);
 void test_lz4_incompressible_overhead(void);
 void test_lz4_rejects_malformed(void);
+void test_lz4_small_thread_stack(void);
 
 /* --- harness ---------------------------------------------------------------------*/
 void test_median_odd_even(void);
