@@ -1,0 +1,10 @@
+.git
+graphify-out
+tests
+tools
+docs
+*.md
+Makefile.bak
+lotofbench
+tests/lotofbench_test
+tools/gen_goldens

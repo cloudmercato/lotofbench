@@ -102,8 +102,12 @@ static size_t emit_last_literals(const uint8_t *src, size_t len,
 size_t lz4_compress(const uint8_t *src, size_t src_len, uint8_t *out,
                     int level)
 {
-    uint32_t table[HASH_SIZE];
-    uint16_t chain[1u << 16];
+    /* Worker threads may only get a 128 KB stack under musl, so the
+     * hash table (256 KB) and the high-level chain (128 KB) cannot live
+     * on the stack. _Thread_local keeps one private copy per thread:
+     * no data race in multi-core runs, no API change. */
+    static _Thread_local uint32_t table[HASH_SIZE];
+    static _Thread_local uint16_t chain[1u << 16];
     const int chained = (level == LZ4_LEVEL_HIGH);
     const size_t bound = lz4_compress_bound(src_len);
     size_t ip = 0, anchor = 0, op = 0;
