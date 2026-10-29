@@ -1,0 +1,43 @@
+name: Auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    name: Auto-merge if green
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Schedule auto-merge
+        env:
+          GITEA_TOKEN: ${{ secrets.GIT_TOKEN || secrets.GITEA_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          api="https://gitea.local.cloud-mercato.com/api/v1/repos/cloud-mercato/lotofbench/pulls/$PR/merge"
+          payload=$(printf '{"Do":"merge","merge_when_checks_succeed":true,"head_commit_id":"%s"}' "$HEAD_SHA")
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /tmp/am-resp.json -w '%{http_code}' -X POST "$api" \
+              -H "Authorization: token $GITEA_TOKEN" -H 'Content-Type: application/json' \
+              -d "$payload")
+            case "$code" in
+              200|204)
+                echo "Auto-merge scheduled (HTTP $code)"; exit 0 ;;
+              409)
+                echo "Already scheduled (HTTP 409, desired state exists)"; exit 0 ;;
+              405)
+                echo "Transient 405 (mergeability still computing), attempt $attempt/3"; sleep 15 ;;
+              *)
+                echo "Unexpected HTTP $code"; cat /tmp/am-resp.json; exit 1 ;;
+            esac
+          done
+          echo "Giving up after 3 attempts"; exit 1
