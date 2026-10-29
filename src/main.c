@@ -14,6 +14,7 @@
 #include "workload_compression.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
+#include "workload_pdfrender.h"
 #include "workload_textprocessing.h"
 
 #include <stdio.h>
@@ -115,6 +116,18 @@ static int run_h5(html5_ctx *h5, unsigned runs, unsigned threads_req,
     return 0;
 }
 
+static int run_pdf(pdf_ctx *pdf, unsigned runs, unsigned threads_req,
+                   lb_result *out, uint64_t *pixels)
+{
+    unsigned t = threads_req;
+
+    if (pdf_run(pdf, runs, &t, &out->throughput, pixels) != 0)
+        return -1;
+    out->threads = t;
+    out->score = lb_score(out->throughput, BASELINE_PDFRENDER_MPIXELS);
+    return 0;
+}
+
 static int run_cl(cl_ctx *cl, unsigned runs, unsigned threads_req,
                   lb_result *out, uint64_t *tokens)
 {
@@ -159,7 +172,10 @@ static void print_json(const options *opt, const lb_result *fc_single,
                        const lb_result *nav_multi, uint64_t nav_ops,
                        const lb_result *h5_single,
                        const lb_result *h5_multi, uint64_t h5_pages,
-                       uint64_t h5_elements, const lb_result *cl_single,
+                       uint64_t h5_elements,
+                       const lb_result *pdf_single,
+                       const lb_result *pdf_multi, uint64_t pdf_pixels,
+                       const lb_result *cl_single,
                        const lb_result *cl_multi, uint64_t cl_tokens,
                        const lb_result *tp_single,
                        const lb_result *tp_multi, uint64_t tp_bytes)
@@ -201,6 +217,16 @@ static void print_json(const options *opt, const lb_result *fc_single,
     printf("     \"multi\": {\"threads\": %u, \"throughput_pps\": %.1f, "
            "\"score\": %ld}},\n",
            h5_multi->threads, h5_multi->throughput, h5_multi->score);
+    printf("    {\"name\": \"%s\", \"docs\": %u, \"pages_per_doc\": %u, "
+           "\"pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
+           PDF_WORKLOAD_SLUG, PDF_DOCS, PDF_PAGES_PER_DOC,
+           (unsigned long long)pdf_pixels, BASELINE_PDFRENDER_MPIXELS);
+    printf("     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+           "\"score\": %ld},\n",
+           pdf_single->threads, pdf_single->throughput, pdf_single->score);
+    printf("     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+           "\"score\": %ld}},\n",
+           pdf_multi->threads, pdf_multi->throughput, pdf_multi->score);
     printf("    {\"name\": \"%s\", \"units\": %u, \"tokens\": %llu, "
            "\"baseline_ktokens\": %.1f,\n",
            CL_WORKLOAD_SLUG, CLANG_UNITS, (unsigned long long)cl_tokens,
@@ -231,15 +257,17 @@ int main(int argc, char **argv)
     fc_ctx *fc = fc_prepare(opt.corpus_mb, opt.seed);
     nav_ctx *nav = nav_prepare(opt.seed);
     html5_ctx *h5 = html5_prepare(opt.seed);
+    pdf_ctx *pdf = pdf_prepare(opt.seed);
     cl_ctx *cl = cl_prepare(opt.seed);
     tp_ctx *tp = tp_prepare(opt.seed);
 
-    if (!fc || !nav || !h5 || !cl || !tp) {
+    if (!fc || !nav || !h5 || !pdf || !cl || !tp) {
         fprintf(stderr,
                 "lotofbench: out of memory building the workload inputs\n");
         fc_free(fc);
         nav_free(nav);
         html5_free(h5);
+        pdf_free(pdf);
         cl_free(cl);
         tp_free(tp);
         return 1;
@@ -248,9 +276,11 @@ int main(int argc, char **argv)
     lb_result fc_single = { 0, 0.0, 0 }, fc_multi = { 0, 0.0, 0 };
     lb_result nav_single = { 0, 0.0, 0 }, nav_multi = { 0, 0.0, 0 };
     lb_result h5_single = { 0, 0.0, 0 }, h5_multi = { 0, 0.0, 0 };
+    lb_result pdf_single = { 0, 0.0, 0 }, pdf_multi = { 0, 0.0, 0 };
     lb_result cl_single = { 0, 0.0, 0 }, cl_multi = { 0, 0.0, 0 };
     lb_result tp_single = { 0, 0.0, 0 }, tp_multi = { 0, 0.0, 0 };
-    uint64_t nav_ops = 0, h5_pages = 0, cl_tokens = 0, tp_bytes = 0;
+    uint64_t nav_ops = 0, h5_pages = 0, pdf_pixels = 0, cl_tokens = 0,
+             tp_bytes = 0;
 
     if (run_fc(fc, opt.runs, 1, &fc_single) != 0 ||
         run_fc(fc, opt.runs, opt.threads, &fc_multi) != 0 ||
@@ -258,6 +288,8 @@ int main(int argc, char **argv)
         run_nav(nav, opt.runs, opt.threads, &nav_multi, &nav_ops) != 0 ||
         run_h5(h5, opt.runs, 1, &h5_single, &h5_pages) != 0 ||
         run_h5(h5, opt.runs, opt.threads, &h5_multi, &h5_pages) != 0 ||
+        run_pdf(pdf, opt.runs, 1, &pdf_single, &pdf_pixels) != 0 ||
+        run_pdf(pdf, opt.runs, opt.threads, &pdf_multi, &pdf_pixels) != 0 ||
         run_cl(cl, opt.runs, 1, &cl_single, &cl_tokens) != 0 ||
         run_cl(cl, opt.runs, opt.threads, &cl_multi, &cl_tokens) != 0 ||
         run_tp(tp, opt.runs, 1, &tp_single, &tp_bytes) != 0 ||
@@ -267,6 +299,7 @@ int main(int argc, char **argv)
         fc_free(fc);
         nav_free(nav);
         html5_free(h5);
+        pdf_free(pdf);
         cl_free(cl);
         tp_free(tp);
         return 1;
@@ -275,10 +308,12 @@ int main(int argc, char **argv)
     if (opt.json) {
         print_json(&opt, &fc_single, &fc_multi, &nav_single, &nav_multi,
                    nav_ops, &h5_single, &h5_multi, h5_pages,
-                   html5_elements(h5), &cl_single, &cl_multi, cl_tokens,
+                   html5_elements(h5), &pdf_single, &pdf_multi,
+                   pdf_pixels, &cl_single, &cl_multi, cl_tokens,
                    &tp_single, &tp_multi, tp_bytes);
     } else {
-        char fc_cfg[64], nav_cfg[64], h5_cfg[64], cl_cfg[64], tp_cfg[64];
+        char fc_cfg[64], nav_cfg[64], h5_cfg[64], pdf_cfg[96], cl_cfg[64],
+             tp_cfg[64];
 
         snprintf(fc_cfg, sizeof(fc_cfg), "corpus %u MB synthetic",
                  opt.corpus_mb);
@@ -287,6 +322,9 @@ int main(int argc, char **argv)
         snprintf(h5_cfg, sizeof(h5_cfg), "%u pages, %llux%llu viewport",
                  HTML5_PAGES, (unsigned long long)HTML5_VIEW_W,
                  (unsigned long long)HTML5_VIEW_H);
+        snprintf(pdf_cfg, sizeof(pdf_cfg),
+                 "%u park maps, %u pages each, %ux%u px @2x", PDF_DOCS,
+                 PDF_PAGES_PER_DOC, PDF_PAGE_W, PDF_PAGE_H);
         snprintf(cl_cfg, sizeof(cl_cfg), "%u units, %llu source tokens",
                  CLANG_UNITS, (unsigned long long)cl_tokens);
         snprintf(tp_cfg, sizeof(tp_cfg),
@@ -304,6 +342,9 @@ int main(int argc, char **argv)
                h5_cfg, (unsigned long long)html5_elements(h5));
         print_block("pages/s", BASELINE_HTML5BROWSER_PPS, &h5_single,
                     &h5_multi);
+        printf("\n%s (%s)\n", PDF_WORKLOAD_NAME, pdf_cfg);
+        print_block("Mpixel/s", BASELINE_PDFRENDER_MPIXELS, &pdf_single,
+                    &pdf_multi);
         printf("\n%s (%s)\n", CL_WORKLOAD_NAME, cl_cfg);
         print_block("Ktokens/s", BASELINE_CLANG_KTOKENS, &cl_single,
                     &cl_multi);
@@ -315,6 +356,7 @@ int main(int argc, char **argv)
     fc_free(fc);
     nav_free(nav);
     html5_free(h5);
+    pdf_free(pdf);
     cl_free(cl);
     tp_free(tp);
     return 0;

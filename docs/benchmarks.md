@@ -18,7 +18,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 1 | File Compression              | LZ4 + ZSTD compress/decompress, SHA-1 verify | **implemented v0.1** |
 | 2 | Navigation                    | Dijkstra routing on OpenStreetMap graphs | **implemented v0.2** |
 | 3 | HTML5 Browser                 | HTML parse, CSS layout, render     | **implemented v0.3** |
-| 4 | PDF Render                    | Vector PDF rendering (PDFium)      | planned |
+| 4 | PDF Render                    | Vector PDF rendering (PDFium)      | **implemented v0.4** |
 | 5 | Photo Library                 | JPEG decode, thumbnails, MobileNet classify + SQLite | planned |
 | 6 | Clang                         | Compiling the Lua interpreter      | **implemented v0.4** |
 | 7 | Text Processing               | Regex parsing, Markdown→HTML (Python) | **implemented v0.5** |
@@ -146,6 +146,56 @@ cascade, floats or flexbox), a bitmap font instead of hinted TrueType,
 procedural images instead of JPEG/PNG decode, 800×600 instead of
 1280×720.
 
+## Workload 4 — PDF Render (implemented)
+
+Geekbench 6's PDF Render workload opens complex PDF documents and
+renders them: it pushes four American National Park Service maps
+(897 KB to 1.5 MB of vector art — fills, lines and text) through
+PDFium — 4 PDFs single-core, 16 PDFs multi-core. LotofBench v0.4
+reproduces the shape of that workload, dependency-free:
+
+- **Corpus**: four seeded "park map" PDF documents, byte sizes matched
+  to the four NPS maps — a cover page and a map page each, written as
+  real PDF 1.4 files (header, catalog, page tree, uncompressed content
+  streams, classic xref table, trailer). Pages are US Letter
+  (612×792 pt) rendered at 2x (144 dpi) into 1224×1584 RGB
+  framebuffers. Fixed `--seed` means byte-identical documents on every
+  machine; the generator uses integer quarter-point arithmetic
+  throughout, so there is no printf float rounding in the corpus.
+- **Map content**: the map pages exercise the features a vector map
+  needs — a stroked coordinate grid, filled elevation-contour blobs
+  built from beziers, a lake fill, a donut chart (even-odd fill with a
+  hole), rotated place labels (a `cm` rotation plus a procedural 4×6
+  cell font drawn as filled rectangles), a legend with swatches and a
+  mitered scale bar, a dashed trail, and a clipped inset panel
+  (`W n`).
+- **Parser**: a from-scratch PDF reader that parses the documents
+  strictly — objects, references, dictionaries, arrays, streams,
+  xref — where anything outside the emitted subset is a parse error.
+- **Renderer**: a from-scratch scanline rasterizer with 4×4
+  anti-aliasing: bezier flattening, nonzero and even-odd filling,
+  stroking (the stroke is built as filled quads with joins, caps and
+  dash splitting) and a coverage clip mask, with gray/RGB/CMYK color.
+  Like the HTML5 Browser renderer it is plain overdraw — no
+  occlusion culling.
+- **Verification**: the whole document set is parsed and rendered
+  inside every timed cycle. Each content stream must reproduce its
+  generator SHA-1 digest, each rendered page must reproduce its
+  prepare-time reference framebuffer digest, a set of
+  generator-computed probe pixels must match exactly, and the operator
+  count must match the generator's count. Any mismatch aborts the run
+  instead of scoring.
+- **Cycle**: one run = the whole document set (parse + render of
+  every page), timed as a whole with `CLOCK_MONOTONIC`. The multi-core
+  pass renders 16 documents (4x the set) split across threads.
+
+Known v0.4 divergences from Geekbench 6, all deliberate: four synthetic
+park maps instead of archived NPS files, uncompressed content streams
+(no Flate), a procedural cell font instead of hinted TrueType outlines,
+and 2x (144 dpi) instead of PDFium's exact rasterization — the
+throughput metric (device pixels per second) is unaffected because the
+pixel count is exact and machine-independent.
+
 ## Workload 6 — Clang (implemented)
 
 Geekbench 6's Clang workload compiles the Lua interpreter sources with
@@ -265,6 +315,11 @@ Each run reports a **throughput**, and the workload result is the
   of the full page set, in pages per second. A page "render" is the
   whole pipeline (parse + layout + raster), so the unit is honest at
   the workload level even though it compresses three distinct stages.
+- **PDF Render** — device pixels rendered divided by the wall-clock
+  seconds of the full document set, in millions of pixels per second
+  (Mpixel/s). The pixel count is exact (pages are a fixed 1224×1584
+  each) and machine-independent, like the corpus size for File
+  Compression.
 - **Clang** — source tokens compiled divided by the wall-clock seconds
   of the full unit set, in decimal thousands of tokens per second
   (Ktokens/s). A "token compiled" is one lexer token carried through
@@ -292,7 +347,7 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with five
+will adopt the same aggregation once more workloads exist; with six
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
@@ -302,6 +357,10 @@ publishes its own score.
 - `BASELINE_HTML5BROWSER_PPS` = **650.0 pages/s** = 1000 (workload #3)
   — the reference machine renders a page (parse + layout + raster of
   an 800×600 viewport) in about 1.5 milliseconds.
+- `BASELINE_PDFRENDER_MPIXELS` = **10.0 Mpixel/s** = 1000 (workload #4)
+  — the reference machine rasterizes about 10 million device pixels
+  per second (a 1224×1584 map page in roughly a fifth of a second,
+  parse included).
 - `BASELINE_CLANG_KTOKENS` = **8500.0 Ktokens/s** = 1000 (workload #6)
   — the reference machine compiles about 8.5 million source tokens per
   second (lex + parse + codegen + verify).
@@ -322,6 +381,10 @@ LotofBench does the same for every workload:
 - **HTML5 Browser** — the page set is split into equal contiguous
   slices, one per thread; each thread tokenizes, lays out and rasters
   its pages, and verifies them against the reference render.
+- **PDF Render** — the multi-core pass renders 16 documents (4x the
+  single-core set) split into equal contiguous document slices, one per
+  thread; each thread parses, renders and verifies its documents
+  against the references.
 - **Clang** — the unit set is split into equal contiguous slices, one
   per thread; each thread lexes, parses, compiles and verifies its
   units against the reference blobs.

@@ -23,6 +23,7 @@
 #include "workload_compression.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
+#include "workload_pdfrender.h"
 #include "workload_textprocessing.h"
 
 #include <stdio.h>
@@ -111,6 +112,18 @@ int main(void)
     }
     html5_free(h5);
 
+    /* pdf render: seed-1 document 0 digest + full-suite op count */
+    pdf_ctx *pdf = pdf_prepare(1);
+
+    if (!pdf)
+        return 1;
+    sha1_hex(pdf_doc(pdf, 0), pdf_doc_len(pdf, 0), hex);
+    printf("\nPDF_SEED1_DOC0_SHA1 %s len=%zu", hex, pdf_doc_len(pdf, 0));
+    uint64_t pdf_ops = 0;
+    for (unsigned d = 0; d < PDF_DOCS; d++)
+        pdf_ops += pdf_doc_ops(pdf, d);
+    printf("\nPDF_SEED1_TOTAL_OPS %llu", (unsigned long long)pdf_ops);
+    pdf_free(pdf);
     /* clang goldens (seed 1): unit 0 (call-graph archetype) source and
      * bytecode, and the corpus token total */
     cl_ctx *cl = cl_prepare(1);

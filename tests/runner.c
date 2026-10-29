@@ -55,6 +55,15 @@ static const test_entry TESTS[] = {
     { "html5/run-sane", test_h5_run_sane },
     { "html5/thread-clamp", test_h5_thread_clamp },
     { "html5/null-accessors", test_h5_accessors_null_safe },
+    /* workload #4 — pdf render */
+    { "pdf/deterministic-docs", test_pdf_deterministic_docs },
+    { "pdf/corpus-golden", test_pdf_corpus_golden },
+    { "pdf/doc-shape", test_pdf_doc_shape },
+    { "pdf/probes-in-bounds", test_pdf_probes_in_bounds },
+    { "pdf/seed-variation", test_pdf_seed_variation },
+    { "pdf/run-sane", test_pdf_run_sane },
+    { "pdf/thread-clamp", test_pdf_thread_clamp },
+    { "pdf/null-accessors", test_pdf_accessors_null_safe },
     /* workload #6 — clang */
     { "clang/units-deterministic", test_cl_units_deterministic },
     { "clang/input-invariants", test_cl_input_invariants },

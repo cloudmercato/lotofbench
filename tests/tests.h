@@ -102,6 +102,15 @@ void test_h5_run_sane(void);
 void test_h5_thread_clamp(void);
 void test_h5_accessors_null_safe(void);
 
+/* --- workload #4: pdf render ------------------------------------------------------------*/
+void test_pdf_deterministic_docs(void);
+void test_pdf_corpus_golden(void);
+void test_pdf_doc_shape(void);
+void test_pdf_probes_in_bounds(void);
+void test_pdf_seed_variation(void);
+void test_pdf_run_sane(void);
+void test_pdf_thread_clamp(void);
+void test_pdf_accessors_null_safe(void);
 /* --- workload #6: clang -----------------------------------------------------------------*/
 void test_cl_units_deterministic(void);
 void test_cl_input_invariants(void);

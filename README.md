@@ -8,11 +8,11 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 5 of 16
+## Status — workload 6 of 16
 
-**File Compression**, **Navigation**, **HTML5 Browser**, **Clang** and
-**Text Processing** are implemented (five of the Geekbench 6 CPU
-workloads). The full
+**File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
+**Clang** and **Text Processing** are implemented (six of the Geekbench
+6 CPU workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
@@ -28,6 +28,11 @@ workload list, the roadmap and the suggested landing order live in
   pages (six site archetypes) into an 800×600 framebuffer with a
   hand-rolled tokenizer, block layout and scanline rasterizer, verify
   every render, score the page rate.
+- **PDF Render** — parse and rasterize four seeded synthetic park-map
+  PDFs (cover + map page, US Letter at 144 dpi) with a from-scratch
+  parser and a 4x4 anti-aliased scanline renderer (fills, strokes,
+  dashes, clipping, CMYK), verify every pixel digest, score the
+  megapixel rate.
 - **Clang** — lex, parse and compile 32 seeded synthetic translation
   units (a Lua-flavoured subset, six archetype families) to bytecode
   with a from-scratch lexer, recursive-descent parser and code
@@ -55,42 +60,68 @@ C11 compiler, Linux/macOS/BSD.
 
 Defaults: 100 MB corpus, 5 runs (median), one thread per online CPU.
 `--json` emits machine-readable results. `--size-mb` sizes the File
-Compression corpus; Navigation and HTML5 Browser use fixed-size inputs
-(the map is the map, the pages are the pages) that vary only with
-`--seed`.
+Compression corpus; every other workload uses fixed-size inputs (the
+map is the map, the pages are the pages) that vary only with `--seed`.
 
 Real output on the development box (12 threads, defaults):
 
 ```
-LotofBench 0.3.0
+LotofBench 0.6.0
 seed 1, 5 runs, median
 
 File Compression (corpus 100 MB synthetic)
 Single-Core
-  throughput      109.8 MB/s
-  score             439   (baseline 250.0 MB/s = 1000)
+  throughput      108.8 MB/s
+  score             435   (baseline 250.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      722.5 MB/s
-  score            2890
+  throughput      677.6 MB/s
+  score            2710
 
 Navigation (grid 512x512, 64 routes)
 Single-Core
-  throughput       45.7 Medge/s
-  score             457   (baseline 100.0 Medge/s = 1000)
+  throughput       44.6 Medge/s
+  score             446   (baseline 100.0 Medge/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      245.2 Medge/s
-  score            2452
+  throughput      239.8 Medge/s
+  score            2398
 
 HTML5 Browser (32 pages, 800x600 viewport, 3544 DOM elements)
 Single-Core
-  throughput      305.4 pages/s
-  score             470   (baseline 650.0 pages/s = 1000)
+  throughput      296.2 pages/s
+  score             456   (baseline 650.0 pages/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput     1297.3 pages/s
-  score            1996
+  throughput     1561.6 pages/s
+  score            2402
+
+PDF Render (4 park maps, 2 pages each, 1224x1584 px @2x)
+Single-Core
+  throughput        3.1 Mpixel/s
+  score             313   (baseline 10.0 Mpixel/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput       13.9 Mpixel/s
+  score            1388
+
+Clang (32 units, 986328 source tokens)
+Single-Core
+  throughput     4857.2 Ktokens/s
+  score             571   (baseline 8500.0 Ktokens/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput    24860.8 Ktokens/s
+  score            2925
+
+Text Processing (32 docs, 8 patterns/doc)
+Single-Core
+  throughput       96.3 MB/s
+  score             481   (baseline 200.0 MB/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput      505.4 MB/s
+  score            2527
 ```
 
 ## What it measures
@@ -139,6 +170,23 @@ Multi-Core (12 threads, shared task)
   record count and SHA-1 digest of the rendered framebuffer must all
   match exactly; a broken pipeline aborts instead of scoring.
 
+### PDF Render
+
+- **Metric** — millions of device pixels rasterized per second
+  (Mpixel/s): every run parses and renders the whole four-document set
+  from scratch, and the throughput is the exact device-pixel count (four
+  documents, two 1224×1584 pages each) divided by the wall-clock time,
+  median over the runs. The pixel count is exact and
+  machine-independent, like the corpus size for File Compression.
+- **Score** — `round(throughput / baseline × 1000)`; the baseline
+  (10.0 Mpixel/s = 1000, i.e. a full map page in about 193 ms) is
+  defined in `src/lotofbench.h`.
+- **Correctness** — the whole document set is parsed and rendered
+  inside the timed cycle and verified against prepare-time references:
+  content-stream SHA-1 digests, rendered-page digests, probe pixels and
+  the operator count must all match exactly; any mismatch aborts
+  instead of scoring.
+
 ## Tests
 
 ```sh
@@ -146,7 +194,7 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 36 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 63 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
@@ -166,7 +214,11 @@ src/harness.[ch]              shared-task threading: start gate, timing, median
 src/workload_compression.[ch] workload #1 — corpus, LZ4 cycles, SHA-1 verify
 src/workload_navigation.[ch]  workload #2 — road grid, Dijkstra, verification
 src/workload_html5browser.[ch] workload #3 — pages, tokenizer, layout, raster
+src/workload_pdfrender.[ch]   workload #4 — park-map PDF corpus, cycles
+src/pdfparse.c                workload #4 kernel — from-scratch PDF reader
+src/pdfrender.c               workload #4 kernel — scanline rasterizer, 4x4 AA
 src/workload_clang.[ch]       workload #6 — units, lexer, parser, codegen
+src/workload_textprocessing.[ch] workload #7 — corpus, regex, Markdown→HTML
 src/lz4.[ch]                  LZ4 block-format codec (from scratch, 2 levels)
 src/sha1.[ch]                 SHA-1 for round-trip verification
 src/main.c                    CLI, suite order, output

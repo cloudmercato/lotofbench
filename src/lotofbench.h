@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.5.0"
+#define LOTOFBENCH_VERSION   "0.6.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -17,6 +17,8 @@
 #define NAV_WORKLOAD_SLUG    "navigation"
 #define HTML5_WORKLOAD_NAME  "HTML5 Browser"
 #define HTML5_WORKLOAD_SLUG  "html5-browser"
+#define PDF_WORKLOAD_NAME    "PDF Render"
+#define PDF_WORKLOAD_SLUG    "pdf-render"
 #define CL_WORKLOAD_NAME     "Clang"
 #define CL_WORKLOAD_SLUG     "clang"
 #define TP_WORKLOAD_NAME     "Text Processing"
@@ -51,6 +53,10 @@
  * page, a round and honest yardstick. */
 #define BASELINE_HTML5BROWSER_PPS     650.0
 
+/* Workload #4 — PDF Render: millions of device pixels rasterized per
+ * second. The 1000-point reference machine rasterizes 10.0 million
+ * pixels per second (a full 1224x1584 park-map page in ~193 ms). */
+#define BASELINE_PDFRENDER_MPIXELS    10.0
 /* Workload #6 — Clang: thousands of source tokens compiled per second
  * (lexed, parsed and emitted as bytecode). The 1000-point reference
  * machine compiles about 8.5 million tokens per second. */
