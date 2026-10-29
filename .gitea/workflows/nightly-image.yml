@@ -1,0 +1,62 @@
+name: Nightly image
+
+on:
+  schedule:
+    - cron: '0 22 * * *'  # 22:00 UTC = 23:00 WET, 1 h after the testing-umbrella nightly (mono-slot runner)
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-image
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    name: Build and push to cm-registry
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gate — skip if HEAD sha already in registry
+        id: gate
+        run: |
+          SHA=$(git rev-parse --short=8 HEAD)
+          TAGS=$(curl -fsS "https://cm-registry.local.cloud-mercato.com/v2/cloud-mercato/lotofbench/tags/list" \
+                 | jq -r '.tags // [] | join(" ")')
+          echo "registry tags: ${TAGS:-<none>}"
+          echo "head sha: $SHA"
+          if echo " $TAGS " | grep -q " $SHA "; then
+            echo "No-op night: image :$SHA already in registry"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New commits detected — build needed"
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Unit tests
+        if: steps.gate.outputs.build == 'true'
+        run: make test
+
+      - name: Set up QEMU
+        if: steps.gate.outputs.build == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        if: steps.gate.outputs.build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push (amd64 + arm64)
+        if: steps.gate.outputs.build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            cm-registry.local.cloud-mercato.com/cloud-mercato/lotofbench:${{ steps.gate.outputs.sha }}
+            cm-registry.local.cloud-mercato.com/cloud-mercato/lotofbench:nightly
+            cm-registry.local.cloud-mercato.com/cloud-mercato/lotofbench:latest
