@@ -24,8 +24,9 @@ jobs:
         id: gate
         run: |
           SHA=$(git rev-parse --short=8 HEAD)
-          TAGS=$(curl -fsS "https://cm-registry.local.cloud-mercato.com/v2/cloud-mercato/lotofbench/tags/list" \
-                 | jq -r '.tags // [] | join(" ")')
+          # 404 NAME_UNKNOWN before the first push is normal: treat as "no tags yet".
+          RESP=$(curl -sS "https://cm-registry.local.cloud-mercato.com/v2/cloud-mercato/lotofbench/tags/list" || true)
+          TAGS=$(echo "$RESP" | jq -r '.tags // [] | join(" ")' 2>/dev/null || true)
           echo "registry tags: ${TAGS:-<none>}"
           echo "head sha: $SHA"
           if echo " $TAGS " | grep -q " $SHA "; then
