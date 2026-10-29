@@ -11,6 +11,7 @@
 #include "harness.h"
 #include "lotofbench.h"
 #include "workload_compression.h"
+#include "workload_html5browser.h"
 #include "workload_navigation.h"
 
 #include <stdio.h>
@@ -100,6 +101,18 @@ static int run_nav(nav_ctx *nav, unsigned runs, unsigned threads_req,
     return 0;
 }
 
+static int run_h5(html5_ctx *h5, unsigned runs, unsigned threads_req,
+                  lb_result *out, uint64_t *pages_rendered)
+{
+    unsigned t = threads_req;
+
+    if (html5_run(h5, runs, &t, &out->throughput, pages_rendered) != 0)
+        return -1;
+    out->threads = t;
+    out->score = lb_score(out->throughput, BASELINE_HTML5BROWSER_PPS);
+    return 0;
+}
+
 /* --- output ------------------------------------------------------------------*/
 
 static void print_block(const char *unit, double baseline,
@@ -117,7 +130,10 @@ static void print_block(const char *unit, double baseline,
 static void print_json(const options *opt, const lb_result *fc_single,
                        const lb_result *fc_multi,
                        const lb_result *nav_single,
-                       const lb_result *nav_multi, uint64_t nav_ops)
+                       const lb_result *nav_multi, uint64_t nav_ops,
+                       const lb_result *h5_single,
+                       const lb_result *h5_multi, uint64_t h5_pages,
+                       uint64_t h5_elements)
 {
     printf("{\n");
     printf("  \"benchmark\": \"lotofbench\",\n");
@@ -142,8 +158,20 @@ static void print_json(const options *opt, const lb_result *fc_single,
            "\"score\": %ld},\n",
            nav_single->threads, nav_single->throughput, nav_single->score);
     printf("     \"multi\": {\"threads\": %u, \"throughput_medges\": %.1f, "
-           "\"score\": %ld}}\n",
+           "\"score\": %ld}},\n",
            nav_multi->threads, nav_multi->throughput, nav_multi->score);
+    printf("    {\"name\": \"%s\", \"pages\": %u, \"view\": \"%ux%u\", "
+           "\"elements\": %llu, \"pages_rendered\": %llu, "
+           "\"baseline_pps\": %.1f,\n",
+           HTML5_WORKLOAD_SLUG, HTML5_PAGES, HTML5_VIEW_W, HTML5_VIEW_H,
+           (unsigned long long)h5_elements,
+           (unsigned long long)h5_pages, BASELINE_HTML5BROWSER_PPS);
+    printf("     \"single\": {\"threads\": %u, \"throughput_pps\": %.1f, "
+           "\"score\": %ld},\n",
+           h5_single->threads, h5_single->throughput, h5_single->score);
+    printf("     \"multi\": {\"threads\": %u, \"throughput_pps\": %.1f, "
+           "\"score\": %ld}}\n",
+           h5_multi->threads, h5_multi->throughput, h5_multi->score);
     printf("  ]\n");
     printf("}\n");
 }
@@ -153,40 +181,50 @@ int main(int argc, char **argv)
     options opt = parse_args(argc, argv);
     fc_ctx *fc = fc_prepare(opt.corpus_mb, opt.seed);
     nav_ctx *nav = nav_prepare(opt.seed);
+    html5_ctx *h5 = html5_prepare(opt.seed);
 
-    if (!fc || !nav) {
+    if (!fc || !nav || !h5) {
         fprintf(stderr,
                 "lotofbench: out of memory building the workload inputs\n");
         fc_free(fc);
         nav_free(nav);
+        html5_free(h5);
         return 1;
     }
 
     lb_result fc_single = { 0, 0.0, 0 }, fc_multi = { 0, 0.0, 0 };
     lb_result nav_single = { 0, 0.0, 0 }, nav_multi = { 0, 0.0, 0 };
-    uint64_t nav_ops = 0;
+    lb_result h5_single = { 0, 0.0, 0 }, h5_multi = { 0, 0.0, 0 };
+    uint64_t nav_ops = 0, h5_pages = 0;
 
     if (run_fc(fc, opt.runs, 1, &fc_single) != 0 ||
         run_fc(fc, opt.runs, opt.threads, &fc_multi) != 0 ||
         run_nav(nav, opt.runs, 1, &nav_single, &nav_ops) != 0 ||
-        run_nav(nav, opt.runs, opt.threads, &nav_multi, &nav_ops) != 0) {
+        run_nav(nav, opt.runs, opt.threads, &nav_multi, &nav_ops) != 0 ||
+        run_h5(h5, opt.runs, 1, &h5_single, &h5_pages) != 0 ||
+        run_h5(h5, opt.runs, opt.threads, &h5_multi, &h5_pages) != 0) {
         fprintf(stderr,
                 "lotofbench: workload failed — a result did not verify\n");
         fc_free(fc);
         nav_free(nav);
+        html5_free(h5);
         return 1;
     }
 
     if (opt.json) {
         print_json(&opt, &fc_single, &fc_multi, &nav_single, &nav_multi,
-                   nav_ops);
+                   nav_ops, &h5_single, &h5_multi, h5_pages,
+                   html5_elements(h5));
     } else {
-        char fc_cfg[64], nav_cfg[64];
+        char fc_cfg[64], nav_cfg[64], h5_cfg[64];
 
         snprintf(fc_cfg, sizeof(fc_cfg), "corpus %u MB synthetic",
                  opt.corpus_mb);
         snprintf(nav_cfg, sizeof(nav_cfg), "grid %ux%u, %u routes",
                  NAV_GRID_SIDE, NAV_GRID_SIDE, NAV_ROUTES);
+        snprintf(h5_cfg, sizeof(h5_cfg), "%u pages, %llux%llu viewport",
+                 HTML5_PAGES, (unsigned long long)HTML5_VIEW_W,
+                 (unsigned long long)HTML5_VIEW_H);
 
         printf("LotofBench %s\n", LOTOFBENCH_VERSION);
         printf("seed %u, %u runs, median\n\n", opt.seed, opt.runs);
@@ -196,9 +234,14 @@ int main(int argc, char **argv)
         printf("\n%s (%s)\n", NAV_WORKLOAD_NAME, nav_cfg);
         print_block("Medge/s", BASELINE_NAVIGATION_MEDGES, &nav_single,
                     &nav_multi);
+        printf("\n%s (%s, %llu DOM elements)\n", HTML5_WORKLOAD_NAME,
+               h5_cfg, (unsigned long long)html5_elements(h5));
+        print_block("pages/s", BASELINE_HTML5BROWSER_PPS, &h5_single,
+                    &h5_multi);
     }
 
     fc_free(fc);
     nav_free(nav);
+    html5_free(h5);
     return 0;
 }

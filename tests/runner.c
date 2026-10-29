@@ -45,6 +45,16 @@ static const test_entry TESTS[] = {
     { "navigation/thread-clamp", test_nav_thread_clamp },
     { "navigation/route-time-guards", test_nav_route_time_guards },
     { "navigation/run-sane", test_nav_run_sane },
+    /* workload #3 — html5 browser */
+    { "html5/pages-deterministic", test_h5_pages_deterministic },
+    { "html5/input-invariants", test_h5_input_invariants },
+    { "html5/parser-units", test_h5_parser_units },
+    { "html5/paint-differential", test_h5_paint_differential },
+    { "html5/layout-invariants", test_h5_layout_invariants },
+    { "html5/pixmap-golden", test_h5_pixmap_golden },
+    { "html5/run-sane", test_h5_run_sane },
+    { "html5/thread-clamp", test_h5_thread_clamp },
+    { "html5/null-accessors", test_h5_accessors_null_safe },
 };
 
 int main(void)

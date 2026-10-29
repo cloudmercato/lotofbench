@@ -17,7 +17,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 |---|-------------------------------|------------------------------------|-----------------|
 | 1 | File Compression              | LZ4 + ZSTD compress/decompress, SHA-1 verify | **implemented v0.1** |
 | 2 | Navigation                    | Dijkstra routing on OpenStreetMap graphs | **implemented v0.2** |
-| 3 | HTML5 Browser                 | HTML parse, CSS layout, render     | planned |
+| 3 | HTML5 Browser                 | HTML parse, CSS layout, render     | **implemented v0.3** |
 | 4 | PDF Render                    | Vector PDF rendering (PDFium)      | planned |
 | 5 | Photo Library                 | JPEG decode, thumbnails, MobileNet classify + SQLite | planned |
 | 6 | Clang                         | Compiling the Lua interpreter      | planned |
@@ -100,6 +100,52 @@ instead of OpenStreetMap data, early-exit point-to-point Dijkstra, no
 contraction hierarchies or other speed-up techniques — the workload
 measures the plain search.
 
+## Workload 3 — HTML5 Browser (implemented)
+
+Geekbench 6's HTML5 Browser workload opens real-world web pages in a
+headless browser: HTML parse, CSS layout, then render of the text and
+images (GB6 itself uses Gumbo, litehtml, FreeType, AGG and libjpeg).
+LotofBench v0.3 reproduces the shape of that workload, dependency-free:
+
+- **Pages**: 32 seeded synthetic pages (GB6 opens 8 single-core / 32
+  multi-core; LotofBench uses 32 for both, split across threads).
+  Six archetype families cycle — portal, article, wiki, feed, search
+  results, landing page — with paragraphs, inline formatting, links,
+  per-page styles, comments, entities (`&amp;` `&lt;` `&#65;`), void
+  elements and images. Pages are generated off the clock (the stand-in
+  for the network fetch) and are byte-identical for a given seed.
+- **Tokenizer**: hand-rolled HTML tokenizer — tags, attributes
+  (quoted and unquoted), comments, doctype, entities, void elements,
+  implied list-item closes, stray-close tolerance. The tokenizer
+  produces a flat DOM with parent/child/next links.
+- **Layout**: block flow — margins collapse to explicit block spacing,
+  inline content is word-wrapped into text runs, images are placed at
+  their seeded `width`/`height` attributes (280–480 px wide for
+  photos, 600–640 px for landing heroes, defaults 240×160 when the
+  attributes are absent). Everything is integer arithmetic, so layouts
+  are machine-independent. The layout result is a display list of
+  records: background fills, border strips, word blits and image
+  blocks.
+- **Render**: a scanline rasterizer paints the display list into an
+  800×600 RGBA framebuffer. Text comes from a built-in 5×7 bitmap
+  font (no FreeType), images from procedural patterns (photo
+  gradients, bar charts, concentric-ring avatars — no libjpeg). Like
+  GB6, rendering is a plain overdraw with no occlusion culling.
+- **Verification**: inside the timed cycle, every page is parsed,
+  laid out and rendered from scratch, and the result is compared
+  against an off-clock reference render of the same page: element
+  count, display-list record count and SHA-1 digest of the rendered
+  framebuffer must all match exactly. A tokenizer bug, a layout
+  drift or a rasterizer corruption aborts the run.
+- **Cycle**: one run = the whole page set (parse + layout + render of
+  all 32 pages), timed as a whole with `CLOCK_MONOTONIC`.
+
+Known v0.3 divergences from Geekbench 6, all deliberate: synthetic
+pages instead of archived real sites, block layout only (no CSS
+cascade, floats or flexbox), a bitmap font instead of hinted TrueType,
+procedural images instead of JPEG/PNG decode, 800×600 instead of
+1280×720.
+
 ## Metric
 
 Each run reports a **throughput**, and the workload result is the
@@ -116,6 +162,10 @@ Each run reports a **throughput**, and the workload result is the
   search; the count is exact and deterministic (same seed, same count),
   so it is the navigation analogue of the corpus size. On the default
   seed the suite relaxes 52,954,982 edges per pass.
+- **HTML5 Browser** — pages rendered divided by the wall-clock seconds
+  of the full page set, in pages per second. A page "render" is the
+  whole pipeline (parse + layout + raster), so the unit is honest at
+  the workload level even though it compresses three distinct stages.
 
 ## Scoring
 
@@ -129,24 +179,30 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with two
+will adopt the same aggregation once more workloads exist; with three
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
 - `BASELINE_FILECOMPRESSION_MBPS` = **250.0 MB/s** = 1000 (workload #1).
 - `BASELINE_NAVIGATION_MEDGES` = **100.0 Medge/s** = 1000 (workload #2)
   — the reference machine relaxes one edge per nanosecond.
+- `BASELINE_HTML5BROWSER_PPS` = **650.0 pages/s** = 1000 (workload #3)
+  — the reference machine renders a page (parse + layout + raster of
+  an 800×600 viewport) in about 1.5 milliseconds.
 
 ## Multi-core model
 
 Geekbench 6 moved to a **shared task** model: threads cooperate on one
 task, each handling a slice, instead of running independent copies.
-LotofBench does the same for both workloads:
+LotofBench does the same for all three workloads:
 
 - **File Compression** — the corpus is split into equal 64-byte-aligned
   chunks, one per thread.
 - **Navigation** — the route set is split into equal contiguous slices,
   one per thread.
+- **HTML5 Browser** — the page set is split into equal contiguous
+  slices, one per thread; each thread tokenizes, lays out and rasters
+  its pages, and verifies them against the reference render.
 
 Runs are synchronised through a start gate (every thread must be ready
 before the clock starts, and the clock stops when the last thread

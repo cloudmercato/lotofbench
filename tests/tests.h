@@ -91,4 +91,15 @@ void test_nav_thread_clamp(void);
 void test_nav_route_time_guards(void);
 void test_nav_run_sane(void);
 
+/* --- workload #3: html5 browser ---------------------------------------------------------*/
+void test_h5_pages_deterministic(void);
+void test_h5_input_invariants(void);
+void test_h5_parser_units(void);
+void test_h5_paint_differential(void);
+void test_h5_layout_invariants(void);
+void test_h5_pixmap_golden(void);
+void test_h5_run_sane(void);
+void test_h5_thread_clamp(void);
+void test_h5_accessors_null_safe(void);
+
 #endif /* LOTOFBENCH_TESTS_H */

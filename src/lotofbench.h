@@ -8,13 +8,15 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.2.0"
+#define LOTOFBENCH_VERSION   "0.3.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
 #define FC_WORKLOAD_SLUG     "file-compression"
 #define NAV_WORKLOAD_NAME    "Navigation"
 #define NAV_WORKLOAD_SLUG    "navigation"
+#define HTML5_WORKLOAD_NAME  "HTML5 Browser"
+#define HTML5_WORKLOAD_SLUG  "html5-browser"
 
 /* Suite and harness defaults — all overridable on the command line
  * (except the thread cap). */
@@ -38,6 +40,12 @@
  * The 1000-point reference machine relaxes 100.0 million edges per
  * second — one edge per nanosecond, a round and honest yardstick. */
 #define BASELINE_NAVIGATION_MEDGES    100.0
+
+/* Workload #3 — HTML5 Browser: pages rendered per second (parse +
+ * layout + raster of one 800x600 page). The 1000-point reference
+ * machine renders 650 pages per second — about 1.5 milliseconds per
+ * page, a round and honest yardstick. */
+#define BASELINE_HTML5BROWSER_PPS     650.0
 
 /* One published workload result (single- or multi-core). */
 typedef struct {

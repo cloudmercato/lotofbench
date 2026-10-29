@@ -15,6 +15,12 @@ list and implementation status live in
   deterministic synthetic road grid, parent-chain verification,
   Medge/s metric) + the shared-task harness factored out to
   `src/harness.c` + the unit-test suite (27 tests, `make test`).
+- **v0.3** — Workload #3 HTML5 Browser (seeded synthetic pages, from
+  scratch tokenizer → block layout → scanline rasterizer into an
+  800×600 framebuffer, reference-render verification inside the timed
+  cycle, pages/s metric) + 9 more tests (36 total) including a
+  differential test of the rasterizer against an independent
+  brute-force compositor.
 
 ## Suggested landing order
 

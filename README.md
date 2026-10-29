@@ -8,11 +8,11 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 2 of 16
+## Status — workload 3 of 16
 
-**File Compression** and **Navigation** are implemented (the first two
-Geekbench 6 CPU workloads). The full workload list, the roadmap and the
-suggested landing order live in
+**File Compression**, **Navigation** and **HTML5 Browser** are
+implemented (the first three Geekbench 6 CPU workloads). The full
+workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
 
@@ -23,6 +23,10 @@ suggested landing order live in
   over a deterministic synthetic road grid (lattice streets, diagonal
   shortcuts, long-range highways), verify every route, score the
   edge-relaxation rate.
+- **HTML5 Browser** — parse, lay out and render 32 seeded synthetic
+  pages (six site archetypes) into an 800×600 framebuffer with a
+  hand-rolled tokenizer, block layout and scanline rasterizer, verify
+  every render, score the page rate.
 
 ## Build (one command)
 
@@ -41,13 +45,14 @@ C11 compiler, Linux/macOS/BSD.
 
 Defaults: 100 MB corpus, 5 runs (median), one thread per online CPU.
 `--json` emits machine-readable results. `--size-mb` sizes the File
-Compression corpus; Navigation uses a fixed-size input (the map is the
-map) that varies only with `--seed`.
+Compression corpus; Navigation and HTML5 Browser use fixed-size inputs
+(the map is the map, the pages are the pages) that vary only with
+`--seed`.
 
 Real output on the development box (12 threads, defaults):
 
 ```
-LotofBench 0.2.0
+LotofBench 0.3.0
 seed 1, 5 runs, median
 
 File Compression (corpus 100 MB synthetic)
@@ -67,6 +72,15 @@ Single-Core
 Multi-Core (12 threads, shared task)
   throughput      245.2 Medge/s
   score            2452
+
+HTML5 Browser (32 pages, 800x600 viewport, 3544 DOM elements)
+Single-Core
+  throughput      305.4 pages/s
+  score             470   (baseline 650.0 pages/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput     1297.3 pages/s
+  score            1996
 ```
 
 ## What it measures
@@ -99,6 +113,22 @@ Multi-Core (12 threads, shared task)
   the result must also clear a straight-line lower bound); a broken
   search aborts instead of scoring.
 
+### HTML5 Browser
+
+- **Metric** — pages per second: every run parses, lays out and
+  rasters the 32-page set from scratch, and the throughput is the page
+  count divided by the wall-clock time, median over the runs. The
+  element count of every page is deterministic — same seed, same DOM,
+  whatever the machine — so it plays the role the corpus size plays
+  for File Compression.
+- **Score** — `round(throughput / baseline × 1000)`; the baseline
+  (650.0 pages/s = 1000, i.e. about 1.5 ms per page) is defined in
+  `src/lotofbench.h`.
+- **Correctness** — every page is verified inside the timed cycle
+  against an off-clock reference render: element count, display-list
+  record count and SHA-1 digest of the rendered framebuffer must all
+  match exactly; a broken pipeline aborts instead of scoring.
+
 ## Tests
 
 ```sh
@@ -106,14 +136,16 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 27 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 36 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
 differential test of Navigation's search against an independent full
-Dijkstra on every route. The suite is kept clean under
-`-fsanitize=address,undefined`; golden values are regenerated with
-`tools/gen_goldens.c` after deliberate format changes only.
+Dijkstra on every route, plus a differential test of HTML5 Browser's
+rasterizer against an independent brute-force compositor that
+re-derives every pixel from the display list. The suite is kept clean
+under `-fsanitize=address,undefined`; golden values are regenerated
+with `tools/gen_goldens.c` after deliberate format changes only.
 
 ## Repository layout
 
@@ -123,6 +155,7 @@ src/rng.[ch]                  deterministic PRNG stream (xorshift*)
 src/harness.[ch]              shared-task threading: start gate, timing, median
 src/workload_compression.[ch] workload #1 — corpus, LZ4 cycles, SHA-1 verify
 src/workload_navigation.[ch]  workload #2 — road grid, Dijkstra, verification
+src/workload_html5browser.[ch] workload #3 — pages, tokenizer, layout, raster
 src/lz4.[ch]                  LZ4 block-format codec (from scratch, 2 levels)
 src/sha1.[ch]                 SHA-1 for round-trip verification
 src/main.c                    CLI, suite order, output

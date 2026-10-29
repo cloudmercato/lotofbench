@@ -20,6 +20,7 @@
 #include "rng.h"
 #include "sha1.h"
 #include "workload_compression.h"
+#include "workload_html5browser.h"
 #include "workload_navigation.h"
 
 #include <stdio.h>
@@ -76,8 +77,36 @@ int main(void)
 
     if (!nav || nav_run(nav, 1, &th, &tp, &ops) != 0)
         return 1;
-    printf("\nNAV_SEED1_EDGES %llu threads_used=%u\n",
+    printf("\nNAV_SEED1_EDGES %llu threads_used=%u",
            (unsigned long long)ops, th);
     nav_free(nav);
+
+    /* html5 goldens (seed 1): total DOM elements, page 0 (portal) and
+     * page 5 (landing) sources and rendered pixmaps */
+    html5_ctx *h5 = html5_prepare(1);
+    static uint8_t pix[HTML5_VIEW_W * HTML5_VIEW_H * 4];
+    static const unsigned HPAGES[] = { 0, 5 };
+
+    if (!h5)
+        return 1;
+    printf("\nHTML5_SEED1_ELEMENTS %llu",
+           (unsigned long long)html5_elements(h5));
+    for (size_t i = 0; i < sizeof HPAGES / sizeof HPAGES[0]; i++) {
+        unsigned p = HPAGES[i];
+        uint64_t elts = html5_page_elements(h5, p);
+        uint64_t recs = html5_page_records(h5, p);
+
+        sha1_hex((const uint8_t *)html5_page_source(h5, p),
+                 html5_page_source_len(h5, p), hex);
+        printf("\nHTML5_SEED1_PAGE%u_SRC_SHA1 %s len=%zu elements=%llu "
+               "records=%llu",
+               p, hex, html5_page_source_len(h5, p),
+               (unsigned long long)elts, (unsigned long long)recs);
+        if (html5_render_page(h5, p, pix) != 0)
+            return 1;
+        sha1_hex(pix, sizeof pix, hex);
+        printf("\nHTML5_SEED1_PAGE%u_PIX_SHA1 %s", p, hex);
+    }
+    html5_free(h5);
     return 0;
 }
