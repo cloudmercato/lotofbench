@@ -21,7 +21,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 4 | PDF Render                    | Vector PDF rendering (PDFium)      | planned |
 | 5 | Photo Library                 | JPEG decode, thumbnails, MobileNet classify + SQLite | planned |
 | 6 | Clang                         | Compiling the Lua interpreter      | **implemented v0.4** |
-| 7 | Text Processing               | Regex parsing, Markdown→HTML (Python) | planned |
+| 7 | Text Processing               | Regex parsing, Markdown→HTML (Python) | **implemented v0.5** |
 | 8 | Asset Compression             | ASTC/BC7/DXT5 texture codecs, Draco mesh | planned |
 | 9 | Object Detection              | MobileNet v1 SSD over photos       | planned |
 | 10| Background Blur               | DeepLabV3+ segmentation on video frames | planned |
@@ -189,6 +189,62 @@ bytecode compiler instead of Clang/LLVM (a system compiler would make
 scores version- and flag-dependent), and blob hashing instead of
 object-file emission.
 
+## Workload 7 — Text Processing (implemented)
+
+Geekbench 6's Text Processing workload runs regex matching and
+Markdown→HTML conversion over text documents, in Python 3. A scripted
+runtime cannot be part of a reproducible benchmark — interpreter
+versions and library drift change the numbers — so LotofBench v0.5
+reproduces the *shape* of that pipeline, dependency-free, with the
+same honesty rules as the other workloads:
+
+- **Documents**: 32 seeded synthetic Markdown documents (fixed
+  `--seed`, generated off the clock), about 1.5 MB of text. Six
+  archetype families cycle — API docs, blog posts, changelogs, log
+  digests, FAQs and READMEs — with headings, paragraphs, bullet and
+  ordered lists, block quotes, fenced code, links, inline code and
+  emphasis. A fixed seed means byte-identical documents on every
+  machine.
+- **Regex engine**: a hand-rolled backtracking VM. Patterns compile
+  to bytecode (literal bytes, `.`, `[...]` classes with negation,
+  `\d` `\w` `\s` and their uppercase negations, groups, alternation,
+  greedy `* + ? {m,n}`, anchors `^ $`) and execute leftmost-first
+  over an explicit backtrack stack (bounded, so a runaway pattern is
+  a hard error, never a hang; a step budget proportional to text
+  length × program size backstops the same guarantee). Semantics
+  follow Python bytes-mode `re`: quantifiers are greedy,
+  alternation is leftmost-first with branch priority, `.` does not
+  match `\n`, negated classes do, and an empty match counts once
+  before the scan advances one byte. Malformed patterns are compile
+  errors, never silently accepted.
+- **Patterns**: each document carries 8 seeded patterns drawn from
+  its archetype's signatures (version strings, URLs, e-mails, quoted
+  strings, code spans, log severities, identifiers, plain words),
+  compiled off the clock.
+- **Markdown→HTML**: a from-scratch converter over a documented
+  subset — ATX headings, fenced code blocks (verbatim), block quotes,
+  unordered and ordered lists, horizontal rules, paragraphs
+  (consecutive plain lines joined with one space), and inline `code`,
+  **strong**, *em* and [links](url) with `&` `<` `>` escaped
+  everywhere. Every block emits its HTML followed by one newline;
+  unmatched inline markers stay literal.
+- **Verification**: inside the timed cycle, every document is scanned
+  by all 8 patterns and converted from scratch, and both results are
+  checked against off-clock references: each pattern's match count
+  and the SHA-1 digest of the converted HTML must match exactly. A
+  regex or conversion drift aborts the run.
+- **Cycle**: one run = the whole document set (8 regex scans + one
+  conversion per document), timed as a whole with `CLOCK_MONOTONIC`.
+  The task is about 13.3 MB (each document counted once for the
+  conversion and once per pattern for the scans), and a single-core
+  pass takes 100–200 ms on the reference machine — long enough to
+  mean something, short enough for many runs.
+
+Known v0.5 divergences from Geekbench 6, all deliberate: synthetic
+documents instead of real text corpora, a from-scratch regex engine
+over the documented subset instead of Python's `re` module, and a
+from-scratch Markdown converter instead of a Python markdown library.
+
 ## Metric
 
 Each run reports a **throughput**, and the workload result is the
@@ -216,6 +272,13 @@ Each run reports a **throughput**, and the workload result is the
   exact and deterministic (same seed, same count), so it is the Clang
   analogue of the corpus size. On the default seed the suite compiles
   986,328 tokens per pass.
+- **Text Processing** — text bytes processed divided by the
+  wall-clock seconds of the full document set, in decimal megabytes
+  per second (1 MB = 1,000,000 bytes). Each document counts once for
+  the Markdown→HTML stage and once per pattern for the regex stage —
+  9× the corpus size, exact and deterministic (same seed, same
+  count), so it is the text-processing analogue of the corpus size.
+  On the default seed the suite processes 13,317,768 bytes per pass.
 
 ## Scoring
 
@@ -229,7 +292,7 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with four
+will adopt the same aggregation once more workloads exist; with five
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
@@ -242,6 +305,9 @@ publishes its own score.
 - `BASELINE_CLANG_KTOKENS` = **8500.0 Ktokens/s** = 1000 (workload #6)
   — the reference machine compiles about 8.5 million source tokens per
   second (lex + parse + codegen + verify).
+- `BASELINE_TEXTPROCESSING_MBPS` = **200.0 MB/s** = 1000 (workload #7)
+  — the reference machine processes about 200 million text bytes per
+  second (8 regex scans + one Markdown conversion per document).
 
 ## Multi-core model
 
@@ -259,6 +325,10 @@ LotofBench does the same for every workload:
 - **Clang** — the unit set is split into equal contiguous slices, one
   per thread; each thread lexes, parses, compiles and verifies its
   units against the reference blobs.
+- **Text Processing** — the document set is split into equal
+  contiguous slices, one per thread; each thread scans its documents'
+  8 patterns, converts them Markdown→HTML and verifies both against
+  the references.
 
 Runs are synchronised through a start gate (every thread must be ready
 before the clock starts, and the clock stops when the last thread

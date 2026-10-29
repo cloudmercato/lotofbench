@@ -8,10 +8,11 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 4 of 16
+## Status — workload 5 of 16
 
-**File Compression**, **Navigation**, **HTML5 Browser** and **Clang**
-are implemented (four of the Geekbench 6 CPU workloads). The full
+**File Compression**, **Navigation**, **HTML5 Browser**, **Clang** and
+**Text Processing** are implemented (five of the Geekbench 6 CPU
+workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
@@ -31,6 +32,11 @@ workload list, the roadmap and the suggested landing order live in
   units (a Lua-flavoured subset, six archetype families) to bytecode
   with a from-scratch lexer, recursive-descent parser and code
   generator, verify every emitted blob, score the token rate.
+- **Text Processing** — scan 32 seeded synthetic Markdown documents
+  (six archetype families) with 8 regex patterns each through a
+  from-scratch backtracking engine, convert every document to HTML
+  with a from-scratch Markdown converter, verify every match count
+  and every HTML digest, score the bytes-processed rate.
 
 ## Build (one command)
 

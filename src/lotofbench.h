@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.4.0"
+#define LOTOFBENCH_VERSION   "0.5.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -19,6 +19,8 @@
 #define HTML5_WORKLOAD_SLUG  "html5-browser"
 #define CL_WORKLOAD_NAME     "Clang"
 #define CL_WORKLOAD_SLUG     "clang"
+#define TP_WORKLOAD_NAME     "Text Processing"
+#define TP_WORKLOAD_SLUG     "text-processing"
 
 /* Suite and harness defaults — all overridable on the command line
  * (except the thread cap). */
@@ -53,6 +55,12 @@
  * (lexed, parsed and emitted as bytecode). The 1000-point reference
  * machine compiles about 8.5 million tokens per second. */
 #define BASELINE_CLANG_KTOKENS        8500.0
+
+/* Workload #7 — Text Processing: megabytes of text processed per
+ * second (every document scanned once per pattern, then converted
+ * Markdown-to-HTML). The 1000-point reference machine processes about
+ * 200 million bytes per second. */
+#define BASELINE_TEXTPROCESSING_MBPS  200.0
 
 /* One published workload result (single- or multi-core). */
 typedef struct {

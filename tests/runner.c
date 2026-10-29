@@ -66,6 +66,16 @@ static const test_entry TESTS[] = {
     { "clang/thread-clamp", test_cl_thread_clamp },
     { "clang/null-accessors", test_cl_accessors_null_safe },
     { "clang/golden", test_cl_golden },
+    /* workload #7 — text processing */
+    { "textprocessing/corpus-deterministic",
+      test_tp_corpus_deterministic },
+    { "textprocessing/input-invariants", test_tp_input_invariants },
+    { "textprocessing/regex-semantics", test_tp_regex_semantics },
+    { "textprocessing/markdown-units", test_tp_markdown_units },
+    { "textprocessing/thread-clamp", test_tp_thread_clamp },
+    { "textprocessing/run-sane", test_tp_run_sane },
+    { "textprocessing/null-accessors", test_tp_accessors_null_safe },
+    { "textprocessing/golden", test_tp_golden },
 };
 
 int main(void)
