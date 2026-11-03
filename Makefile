@@ -19,6 +19,7 @@ SRC = src/main.c \
       src/workload_pdfrender.c \
       src/pdfparse.c \
       src/pdfrender.c \
+      src/workload_photolibrary.c \
       src/workload_clang.c \
       src/workload_textprocessing.c \
       src/workload_photofilter.c \
@@ -37,6 +38,7 @@ HDR = src/lotofbench.h \
       src/workload_pdfrender.h \
       src/pdf.h \
       src/pdfrender.h \
+      src/workload_photolibrary.h \
       src/workload_clang.h \
       src/workload_textprocessing.h \
       src/workload_photofilter.h \
@@ -57,6 +59,7 @@ TESTS_SRC = tests/runner.c \
             tests/test_workload_navigation.c \
             tests/test_workload_html5browser.c \
             tests/test_workload_pdfrender.c \
+            tests/test_workload_photolibrary.c \
             tests/test_workload_clang.c \
             tests/test_workload_textprocessing.c \
             tests/test_imgops.c \

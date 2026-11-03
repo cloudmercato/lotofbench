@@ -61,4 +61,14 @@ void img_crop(uint8_t *dst, size_t dw,
 void img_scale_bilinear(uint8_t *dst, size_t dw, size_t dh,
                         const uint8_t *src, size_t sw, size_t sh);
 
+/* Exact box downscale for integer ratios: the dst (dw x dh) pixel at
+ * (x, y) is the half-up-rounded mean of the (sw/dw) x (sh/dh) source
+ * block that covers it. Packed RGB in, packed RGB out. The caller
+ * guarantees dw, dh >= 1 and that sw and sh divide by dw and dh
+ * (the workload thumbnails use power-of-two ratios). Every source
+ * pixel contributes to exactly one destination pixel, so the pass
+ * reads each source pixel once per thumbnail. */
+void img_box_downscale(uint8_t *dst, size_t dw, size_t dh,
+                       const uint8_t *src, size_t sw, size_t sh);
+
 #endif /* IMGOPS_H */

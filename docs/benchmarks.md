@@ -19,7 +19,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 2 | Navigation                    | Dijkstra routing on OpenStreetMap graphs | **implemented v0.2** |
 | 3 | HTML5 Browser                 | HTML parse, CSS layout, render     | **implemented v0.3** |
 | 4 | PDF Render                    | Vector PDF rendering (PDFium)      | **implemented v0.4** |
-| 5 | Photo Library                 | JPEG decode, thumbnails, MobileNet classify + SQLite | planned |
+| 5 | Photo Library                 | JPEG decode, thumbnails, MobileNet classify + SQLite | **implemented v0.10** |
 | 6 | Clang                         | Compiling the Lua interpreter      | **implemented v0.4** |
 | 7 | Text Processing               | Regex parsing, Markdown→HTML (Python) | **implemented v0.5** |
 | 8 | Asset Compression             | ASTC/BC7/DXT5 texture codecs, Draco mesh | planned |
@@ -195,6 +195,64 @@ park maps instead of archived NPS files, uncompressed content streams
 and 2x (144 dpi) instead of PDFium's exact rasterization — the
 throughput metric (device pixels per second) is unaffected because the
 pixel count is exact and machine-independent.
+
+## Workload 5 — Photo Library (implemented)
+
+Geekbench 6's Photo Library workload organizes a photo collection: it
+decodes each photo, generates thumbnails, classifies it with MobileNet
+1.0 for the auto-tag and stores the metadata in SQLite. LotofBench
+v0.10 reproduces the shape of that import session, dependency-free:
+
+- **Corpus**: 16 seeded synthetic photos (1280x960 RGB) in eight
+  content classes — beach, forest, desert, ocean, snow, volcano,
+  meadow, night — that cycle the way a real camera roll does. Each
+  photo is a vertical class gradient, a banding texture, 2-3 seeded
+  shapes in the class accent color and per-pixel noise, all integer
+  arithmetic. Fixed `--seed` means byte-identical corpora on every
+  machine. The photos are generated off the clock — the stand-in for
+  the card import (and for the JPEG decode Geekbench measures).
+- **Thumbnail ladder**: three exact box thumbnails per photo at 1/4,
+  1/8 and 1/16 linear scale (320x240, 160x120, 80x60) via the shared
+  `img_box_downscale` kernel — the destination pixel is the half-up
+  rounded mean of its source block, so every source pixel contributes
+  to exactly one destination pixel per thumbnail.
+- **Classifier (the MobileNet stand-in)**: a fixed integer conv pass
+  over the 1/8 thumbnail — 8 filters (3x3, 8.8 fixed point), ReLU
+  clamp, 2x2 max pool, global average pool — yielding an 8-dim feature
+  vector. The filters are workload constants (not learned weights):
+  three per-channel mean probes, a luma probe, three signed gradient
+  probes and a zero-sum Laplacian. The auto-tag is nearest-centroid
+  classification against the per-class reference features, computed in
+  prepare by taking the clean class background through the exact same
+  downscale + conv path (so the reference sits at the center of what
+  the classifier sees for clean photos of that class).
+- **Verification**: a pass only counts if every thumbnail reproduces
+  its prepare-time SHA-1 digest and every tag recovers the planted
+  class of its photo (the corpus generator plants it, so a wrong tag
+  means the classifier — or the corpus — is broken and the run aborts
+  instead of scoring). The 16-photo corpus itself is only accepted if
+  all 16 photos classify correctly at prepare time.
+- **Record store (the SQLite stand-in)**: one record per ingested
+  photo — id, class tag, luma probe, largest thumbnail size, a
+  4-byte integrity tag from the thumbnail digest — inserted into a
+  per-slice open-addressing hash table. After the ingest, integrity
+  queries run inside the timed cycle: every id must be present with
+  the expected fields, and the per-class counts and id lists must
+  match the planted ground truth. The multi-core pass gives each
+  thread its own store over its own slice; threads never share
+  writable state.
+- **Cycle**: one run = the whole photo set (thumbnail ladder + digest
+  verify + conv + tag + ingest + store queries per photo), timed as a
+  whole with `CLOCK_MONOTONIC`. The multi-core pass ingests 64 photos
+  (4x the set) split across threads.
+
+Known v0.10 divergences from Geekbench 6, all deliberate: synthetic
+photos instead of a real photo library, no JPEG codec (the decode
+stage is off the clock and the pipeline reads raw RGB), a fixed
+8-filter integer conv pass instead of MobileNet v1, and an in-memory
+record store instead of SQLite. The metric is photos per second, the
+photo-workload analogue of HTML5 Browser's pages/s; the photo geometry
+is fixed by the workload constants, so it is machine-independent.
 
 ## Workload 6 — Clang (implemented)
 
@@ -513,6 +571,9 @@ publishes its own score.
   — the reference machine rasterizes about 10 million device pixels
   per second (a 1224×1584 map page in roughly a fifth of a second,
   parse included).
+- `BASELINE_PHOTOLIBRARY_IPS` = **200.0 img/s** = 1000 (workload #5)
+  — the reference machine ingests a 1280×960 photo in about five
+  milliseconds (thumbnail ladder + conv + auto-tag + store).
 - `BASELINE_CLANG_KTOKENS` = **8500.0 Ktokens/s** = 1000 (workload #6)
   — the reference machine compiles about 8.5 million source tokens per
   second (lex + parse + codegen + verify).
