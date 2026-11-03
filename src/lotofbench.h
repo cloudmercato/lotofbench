@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.6.0"
+#define LOTOFBENCH_VERSION   "0.7.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -23,6 +23,8 @@
 #define CL_WORKLOAD_SLUG     "clang"
 #define TP_WORKLOAD_NAME     "Text Processing"
 #define TP_WORKLOAD_SLUG     "text-processing"
+#define PF_WORKLOAD_NAME     "Photo Filter"
+#define PF_WORKLOAD_SLUG     "photo-filter"
 
 /* Suite and harness defaults — all overridable on the command line
  * (except the thread cap). */
@@ -67,6 +69,12 @@
  * Markdown-to-HTML). The 1000-point reference machine processes about
  * 200 million bytes per second. */
 #define BASELINE_TEXTPROCESSING_MBPS  200.0
+
+/* Workload #13 — Photo Filter: millions of output pixels per second
+ * (each photo contributes its full 1600x1200 filtered frame). The
+ * 1000-point reference machine filters 50.0 million pixels per second
+ * (a full photo through all five stages in ~37 ms). */
+#define BASELINE_PHOTOFILTER_MPIXELS  50.0
 
 /* One published workload result (single- or multi-core). */
 typedef struct {

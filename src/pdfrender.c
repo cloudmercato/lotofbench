@@ -1542,7 +1542,7 @@ static int render_common(const uint8_t *contents, size_t clen,
         *ops = r.ops;
 
 out:
-    rpath_clear(&r.path);
+    rpath_free(&r.path); /* pts + contour array (clear only reuses mid-stream) */
     for (uint32_t i = 0; i < PDF_GSTATE_MAX; i++) {
         free(r.gs[i].clip_saved);
         r.gs[i].clip_saved = NULL;

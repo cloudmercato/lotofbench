@@ -23,6 +23,7 @@
 #include "workload_compression.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
+#include "workload_photofilter.h"
 #include "workload_pdfrender.h"
 #include "workload_textprocessing.h"
 
@@ -165,5 +166,26 @@ int main(void)
     printf("\nTP_SEED1_TASK_BYTES %llu",
            (unsigned long long)tp_bytes(tpw));
     tp_free(tpw);
+
+    /* photo filter: seed-1 photo 0 source digest + filtered reference
+     * digest + the exact task pixel counts */
+    pf_ctx *pf = pf_prepare(1);
+
+    if (!pf)
+        return 1;
+    sha1_hex(pf_photo(pf, 0), pf_photo_len(pf, 0), hex);
+    printf("\nPF_SEED1_PHOTO0_SHA1 %s len=%zu", hex, pf_photo_len(pf, 0));
+    {
+        const uint8_t *ref = pf_reference_digest(pf, 0);
+
+        printf("\nPF_SEED1_PHOTO0_REF");
+        for (int i = 0; i < 20; i++)
+            printf(" %02x", ref[i]);
+    }
+    printf("\nPF_SEED1_TASK_PIXELS %llu",
+           (unsigned long long)pf_task_pixels(0));
+    printf("\nPF_SEED1_TASK_PIXELS_MULTI %llu",
+           (unsigned long long)pf_task_pixels(1));
+    pf_free(pf);
     return 0;
 }

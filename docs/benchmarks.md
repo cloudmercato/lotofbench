@@ -27,7 +27,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 10| Background Blur               | DeepLabV3+ segmentation on video frames | planned |
 | 11| Object Remover                | Inpainting (content-aware fill)    | planned |
 | 12| Horizon Detection             | Canny edges + Hough transform      | planned |
-| 13| Photo Filter                  | Color/blur filters, crop, scale    | planned |
+| 13| Photo Filter                  | Color/blur filters, crop, scale    | **implemented v0.7** |
 | 14| HDR                           | Blending six 16 MP SDR photos      | planned |
 | 15| Ray Tracer                    | Blender BMW scene, Embree-style    | planned |
 | 16| Structure from Motion         | 3D geometry from 2D image pairs    | planned |
@@ -295,6 +295,44 @@ documents instead of real text corpora, a from-scratch regex engine
 over the documented subset instead of Python's `re` module, and a
 from-scratch Markdown converter instead of a Python markdown library.
 
+## Workload 13 — Photo Filter (implemented)
+
+Geekbench 6's Photo Filter workload runs a stack of image-processing
+filters over a set of photos — color/blur filters, levels, crop and
+scale — 10 photos single-core, 40 multi-core. LotofBench v0.7
+reproduces the shape dependency-free:
+
+- **Corpus**: ten seeded synthetic photos (1600×1200 RGB) cycling six
+  archetype families — sunset landscape, studio portrait, night
+  street, product shot, food close-up, scanned document. Each photo is
+  a vertical gradient, a parabolic banding texture, seeded shapes
+  (disks built with an exact integer square root, rectangles) and
+  per-pixel noise, all integer arithmetic. Fixed `--seed` means
+  byte-identical photos on every machine; generation is off the clock
+  (the stand-in for the camera import).
+- **Pipeline**: a fixed five-stage filter stack per photo —
+  saturation (Rec.601 luma, 8.8 fixed point), a black/white-point
+  levels stretch, a two-pass box blur (radius 2, the Gaussian
+  approximation), a central 7/8 crop and a bilinear rescale back to
+  the full frame. Every stage is a shared integer kernel
+  (`src/imgops.c`) that the later image workloads reuse; there is no
+  floating point anywhere, so results are bit-identical across
+  machines and compilers.
+- **Verification**: the whole photo set is filtered inside every timed
+  cycle, and each filtered output must reproduce its prepare-time
+  reference SHA-1 digest; any mismatch aborts the run instead of
+  scoring.
+- **Cycle**: one run = the whole photo set (all five stages of every
+  photo), timed as a whole with `CLOCK_MONOTONIC`. The multi-core pass
+  filters 40 photos (4x the set) split across threads.
+
+Known v0.7 divergences from Geekbench 6, all deliberate: synthetic
+photos instead of real image files, a two-pass box blur instead of
+GB6's exact blur kernel, and one fixed documented pipeline instead of
+GB6's per-photo filter choices — the throughput metric (output pixels
+per second) is unaffected because the pixel count is exact and
+machine-independent.
+
 ## Metric
 
 Each run reports a **throughput**, and the workload result is the
@@ -334,6 +372,11 @@ Each run reports a **throughput**, and the workload result is the
   9× the corpus size, exact and deterministic (same seed, same
   count), so it is the text-processing analogue of the corpus size.
   On the default seed the suite processes 13,317,768 bytes per pass.
+- **Photo Filter** — output pixels filtered divided by the wall-clock
+  seconds of the full photo set, in millions of pixels per second
+  (Mpixel/s). Each photo contributes its exact 1600×1200 output frame
+  (19,200,000 pixels per single-core pass); the count is
+  machine-independent, like the corpus size for File Compression.
 
 ## Scoring
 
@@ -347,7 +390,7 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with six
+will adopt the same aggregation once more workloads exist; with seven
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
@@ -392,6 +435,10 @@ LotofBench does the same for every workload:
   contiguous slices, one per thread; each thread scans its documents'
   8 patterns, converts them Markdown→HTML and verifies both against
   the references.
+- **Photo Filter** — the multi-core pass filters 40 photos (4x the
+  single-core set) split into equal contiguous slices, one per thread;
+  each thread runs all five stages on its photos and verifies every
+  output against the reference digests.
 
 Runs are synchronised through a start gate (every thread must be ready
 before the clock starts, and the clock stops when the last thread
