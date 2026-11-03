@@ -295,6 +295,57 @@ documents instead of real text corpora, a from-scratch regex engine
 over the documented subset instead of Python's `re` module, and a
 from-scratch Markdown converter instead of a Python markdown library.
 
+## Workload 12 — Horizon Detection (implemented)
+
+Geekbench 6's Horizon Detection workload finds the horizon line in a
+set of photos with a Canny edge detector followed by a Hough
+transform — the classic "where does the sky meet the ground" computer
+vision pass. LotofBench v0.8 reproduces the shape dependency-free,
+integer-only:
+
+- **Corpus**: eight seeded synthetic photos (1600×1200 RGB) cycling six
+  archetype families — open sky, mountain ridge, sea horizon, desert
+  dunes, city skyline, overcast dusk. Each photo is a seeded sky
+  gradient, a textured ground half, and a *planted horizon*: a
+  piecewise-straight boundary (one straight segment, slope −64..+64,
+  midpoint within ±50 px of the frame centre) whose parameters are
+  drawn from the seed. Shapes silhouetted on the ground shade the sky
+  side; per-pixel noise completes the scene. Fixed `--seed` means
+  byte-identical photos on every machine; generation is off the clock.
+- **Pipeline**: the full classical chain, every stage a documented
+  integer kernel — Rec.601 grayscale (8.8 fixed point), a separable
+  5-tap Gaussian blur (`[1 4 6 4 1]/16`, ~1.4 px sigma), 3×3 Sobel
+  gradients (`|gx|+|gy|` magnitude with the 2-bit orientation sector
+  packed alongside), 3×3 non-maximum suppression (sector-aware
+  neighbours, 2-px ridge rule), a double threshold with hysteresis
+  (strong `HD_EDGE_HIGH` seeds a bounded DFS through weak
+  `HD_EDGE_LOW` neighbours), then the Hough transform over **720
+  theta bins of 0.25°** and a ±2001 px rho range (the frame diagonal).
+  The peak vote cell above `HD_MIN_VOTES` (300) is the detection.
+- **Why 0.25° bins**: at 1° per bin a tilted line's vote ridge spreads
+  over several rho cells and a 160 px building edge outvotes the
+  horizon; at 0.25° the horizon peak concentrates (~550+ votes on the
+  reference corpus) above every distractor (≤ ~134 votes), with the
+  trig table rounded once at generation time so every machine
+  computes the identical accumulator.
+- **Verification**: the whole photo set is detected inside every timed
+  cycle. Each detection is checked twice — against the prepare-time
+  reference result (bit-identical) *and* against the planted ground
+  truth: the detected normal must align with the planted normal within
+  1°, rho within 3 px, and clear the vote floor. A Canny or Hough
+  drift aborts the run instead of scoring.
+- **Cycle**: one run = the whole photo set (all pipeline stages of
+  every photo), timed as a whole with `CLOCK_MONOTONIC`. The
+  multi-core pass detects 32 photos (4x the set) split across threads.
+
+Known v0.8 divergences from Geekbench 6, all deliberate: synthetic
+photos with a planted, verifiable horizon instead of real aerial
+imagery, a fixed documented pipeline (GB6 does not publish its exact
+Canny/Hough parameters), and the vote-count detection rule in place of
+GB6's unspecified peak post-processing — the throughput metric (input
+pixels per second) is unaffected because the pixel count is exact and
+machine-independent.
+
 ## Workload 13 — Photo Filter (implemented)
 
 Geekbench 6's Photo Filter workload runs a stack of image-processing
@@ -372,6 +423,11 @@ Each run reports a **throughput**, and the workload result is the
   9× the corpus size, exact and deterministic (same seed, same
   count), so it is the text-processing analogue of the corpus size.
   On the default seed the suite processes 13,317,768 bytes per pass.
+- **Horizon Detection** — input pixels detected divided by the
+  wall-clock seconds of the full photo set, in millions of pixels per
+  second (Mpixel/s). Each photo contributes its exact 1600×1200 frame
+  (15,360,000 pixels per single-core pass); the count is
+  machine-independent, like the corpus size for File Compression.
 - **Photo Filter** — output pixels filtered divided by the wall-clock
   seconds of the full photo set, in millions of pixels per second
   (Mpixel/s). Each photo contributes its exact 1600×1200 output frame
@@ -390,7 +446,7 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with seven
+will adopt the same aggregation once more workloads exist; with eight
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
@@ -410,6 +466,14 @@ publishes its own score.
 - `BASELINE_TEXTPROCESSING_MBPS` = **200.0 MB/s** = 1000 (workload #7)
   — the reference machine processes about 200 million text bytes per
   second (8 regex scans + one Markdown conversion per document).
+- `BASELINE_HORIZONDETECTION_MPIXELS` = **50.0 Mpixel/s** = 1000
+  (workload #12) — the reference machine runs the full grayscale →
+  blur → Sobel → NMS → hysteresis → Hough chain over about 50 million
+  pixels per second (a 1600×1200 photo in about 38 ms).
+- `BASELINE_PHOTOFILTER_MPIXELS` = **50.0 Mpixel/s** = 1000 (workload
+  #13) — the reference machine filters about 50 million output pixels
+  per second (the five-stage stack over a 1600×1200 photo in about
+  45 ms).
 
 ## Multi-core model
 
@@ -435,6 +499,11 @@ LotofBench does the same for every workload:
   contiguous slices, one per thread; each thread scans its documents'
   8 patterns, converts them Markdown→HTML and verifies both against
   the references.
+- **Horizon Detection** — the multi-core pass detects 32 photos (4x
+  the single-core set) split into equal contiguous slices, one per
+  thread; each thread runs the full Canny + Hough chain on its photos
+  and verifies every detection against the reference results and the
+  planted ground truth.
 - **Photo Filter** — the multi-core pass filters 40 photos (4x the
   single-core set) split into equal contiguous slices, one per thread;
   each thread runs all five stages on its photos and verifies every

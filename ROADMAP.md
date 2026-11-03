@@ -35,14 +35,20 @@ list and implementation status live in
   box blur, crop and bilinear scale over synthetic photos, built on
   the shared `src/imgops.c` kernels; reference-digest verification,
   Mpixel/s metric).
+- **v0.8** — Workload #12 Horizon Detection (the full Canny chain —
+  grayscale, separable Gaussian blur, Sobel, non-maximum suppression,
+  double threshold with hysteresis — followed by a 0.25°-bin Hough
+  transform over seeded synthetic photos with planted, ground-truth
+  horizons; every detection verified against both the reference
+  results and the planted line, Mpixel/s metric) + the shared
+  `img_grayscale` and `img_gray_gaussian_blur5` kernels in
+  `src/imgops.c`.
 
 ## Suggested landing order
 
-1. **#12 Horizon Detection** — Canny + Hough, with synthetic
-   ground-truth horizons to verify against.
-2. **#15 Ray Tracer** — Whitted-style tracer + BVH over a synthetic
+1. **#15 Ray Tracer** — Whitted-style tracer + BVH over a synthetic
    scene; the flagship floating-point workload.
-3. **#5 Photo Library** — box-filter thumbnails + a tiny fixed conv
+2. **#5 Photo Library** — box-filter thumbnails + a tiny fixed conv
    pass + an in-memory record store, reusing the imgops kernels.
 
 ## The remaining Geekbench 6 CPU workloads
@@ -69,7 +75,7 @@ the same grouping once it aggregates (see Composite scoring).
 | 9 | Object Detection | MobileNet v1 SSD over photos | Fixed deterministic quantized (int8) conv net over synthetic images; metric images/s; verify output tensor hash |
 | 10 | Background Blur | DeepLabV3+ segmentation on video | Simplified segmentation mask + per-pixel blur strength over synthetic frames; metric fps |
 | 11 | Object Remover | Inpainting (content-aware fill) | Iterative Laplacian/pyramid fill over synthetic masks; metric Mpixels/s |
-| 12 | Horizon Detection | Canny edges + Hough transform | From-scratch Canny + Hough over synthetic images with known horizons; metric Mpixels/s; verify detected line parameters against ground truth |
+| 12 | Horizon Detection | Canny edges + Hough transform | From-scratch Canny + Hough over synthetic images with known horizons; metric Mpixels/s; verify detected line parameters against ground truth — **implemented v0.8** |
 | 13 | Photo Filter | Color/blur filters, crop, scale | Gaussian/box blur, saturation, crop+scale pipelines over synthetic images; metric Mpixels/s — **implemented v0.7** |
 | 14 | HDR | Blending six 16 MP SDR photos | Simplified exposure-fusion (pyramid blend) over six synthetic exposures; metric Mpixels/s |
 | 15 | Ray Tracer | Blender BMW scene, Embree-style | Whitted-style tracer with a BVH over a deterministic synthetic scene; metric Mrays/s; verify pixel hash |

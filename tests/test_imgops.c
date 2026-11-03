@@ -166,6 +166,79 @@ void test_img_box_blur(void)
     }
 }
 
+void test_img_grayscale(void)
+{
+    /* Rec.601 luma, weights 77/150/29 (sum 256), half-up:
+     * (255,255,255) -> 255, (0,0,0) -> 0, primaries 77/149/29,
+     * (100,150,200) -> (7700+22500+5800+128)>>8 = 141 */
+    {
+        const uint8_t src[18] = { 255, 255, 255, 0, 0, 0, 255, 0, 0,
+                                  0, 255, 0, 0, 0, 255, 100, 150, 200 };
+        const uint8_t want[6] = { 255, 0, 77, 149, 29, 141 };
+        uint8_t dst[6];
+
+        img_grayscale(src, 6, 1, dst);
+        CHECK(memcmp(dst, want, 6) == 0);
+    }
+    {
+        /* every pixel maps independently (3x2, row-major) */
+        uint8_t src[18], dst[6];
+
+        for (int i = 0; i < 18; i++)
+            src[i] = (uint8_t)(i * 13 % 256);
+        img_grayscale(src, 3, 2, dst);
+        for (int p = 0; p < 6; p++) {
+            int32_t v = src[p * 3] * 77 + src[p * 3 + 1] * 150 +
+                        src[p * 3 + 2] * 29 + 128;
+
+            CHECK_U64(dst[p], (uint32_t)(v >> 8));
+        }
+    }
+}
+
+void test_img_gray_gaussian_blur5(void)
+{
+    static uint8_t a[64 * 64], scratch[64 * 64];
+
+    /* 1x1 all-same: unchanged (edge-clamped window, small-image rule) */
+    a[0] = 77;
+    img_gray_gaussian_blur5(a, 1, 1, scratch);
+    CHECK_U64(a[0], 77);
+
+    /* 9x1 impulse 160 at x=4: [1 4 6 4 1]/16, half-up at 4 bits ->
+     * [10, 40, 60, 40, 10] */
+    {
+        const uint8_t want[9] = { 0, 0, 10, 40, 60, 40, 10, 0, 0 };
+
+        memset(a, 0, 9);
+        a[4] = 160;
+        img_gray_gaussian_blur5(a, 9, 1, scratch);
+        CHECK(memcmp(a, want, 9) == 0);
+    }
+    /* 5x5 impulse 160 at (2,2): the separable kernel squared, with
+     * edge-clamped windows folding the response back into the frame —
+     * exact expected grid (verified by hand, two half-up passes) */
+    {
+        static const uint8_t want[25] = {
+            1, 3, 4, 3, 1,
+            3, 10, 15, 10, 3,
+            4, 15, 23, 15, 4,
+            3, 10, 15, 10, 3,
+            1, 3, 4, 3, 1
+        };
+
+        memset(a, 0, 25);
+        a[2 * 5 + 2] = 160;
+        img_gray_gaussian_blur5(a, 5, 5, scratch);
+        CHECK(memcmp(a, want, 25) == 0);
+    }
+    /* constant image stays constant through both passes */
+    memset(a, 200, 64 * 64);
+    img_gray_gaussian_blur5(a, 64, 64, scratch);
+    for (int i = 0; i < 64 * 64; i++)
+        CHECK_U64(a[i], 200);
+}
+
 void test_img_crop(void)
 {
     uint8_t src[36], want[12], dst[12];
