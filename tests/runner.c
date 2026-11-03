@@ -85,6 +85,22 @@ static const test_entry TESTS[] = {
     { "textprocessing/run-sane", test_tp_run_sane },
     { "textprocessing/null-accessors", test_tp_accessors_null_safe },
     { "textprocessing/golden", test_tp_golden },
+    /* imgops — shared deterministic image kernels */
+    { "imgops/levels", test_img_levels },
+    { "imgops/color-matrix", test_img_color_matrix },
+    { "imgops/saturate", test_img_saturate },
+    { "imgops/box-blur", test_img_box_blur },
+    { "imgops/crop", test_img_crop },
+    { "imgops/scale", test_img_scale },
+    /* workload #13 — photo filter */
+    { "photofilter/photos-deterministic", test_pf_photos_deterministic },
+    { "photofilter/input-invariants", test_pf_input_invariants },
+    { "photofilter/reference-reproducible", test_pf_reference_reproducible },
+    { "photofilter/corpus-golden", test_pf_corpus_golden },
+    { "photofilter/seed-variation", test_pf_seed_variation },
+    { "photofilter/run-sane", test_pf_run_sane },
+    { "photofilter/thread-clamp", test_pf_thread_clamp },
+    { "photofilter/null-accessors", test_pf_accessors_null_safe },
 };
 
 int main(void)

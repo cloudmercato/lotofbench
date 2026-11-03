@@ -8,11 +8,11 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 6 of 16
+## Status — workload 7 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
-**Clang** and **Text Processing** are implemented (six of the Geekbench
-6 CPU workloads). The full
+**Clang**, **Text Processing** and **Photo Filter** are implemented
+(seven of the Geekbench 6 CPU workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
@@ -42,6 +42,11 @@ workload list, the roadmap and the suggested landing order live in
   from-scratch backtracking engine, convert every document to HTML
   with a from-scratch Markdown converter, verify every match count
   and every HTML digest, score the bytes-processed rate.
+- **Photo Filter** — filter ten seeded synthetic photos (six archetype
+  families, 1600×1200 px) through a fixed five-stage stack —
+  saturation, levels, two-pass box blur, central crop, bilinear
+  rescale — built on shared integer image kernels, verify every
+  filtered digest, score the megapixel rate.
 
 ## Build (one command)
 
@@ -66,62 +71,71 @@ map is the map, the pages are the pages) that vary only with `--seed`.
 Real output on the development box (12 threads, defaults):
 
 ```
-LotofBench 0.6.0
+LotofBench 0.7.0
 seed 1, 5 runs, median
 
 File Compression (corpus 100 MB synthetic)
 Single-Core
-  throughput      108.8 MB/s
-  score             435   (baseline 250.0 MB/s = 1000)
+  throughput      104.1 MB/s
+  score             416   (baseline 250.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      677.6 MB/s
-  score            2710
+  throughput      564.0 MB/s
+  score            2256
 
 Navigation (grid 512x512, 64 routes)
 Single-Core
-  throughput       44.6 Medge/s
-  score             446   (baseline 100.0 Medge/s = 1000)
+  throughput       41.3 Medge/s
+  score             413   (baseline 100.0 Medge/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      239.8 Medge/s
-  score            2398
+  throughput      205.8 Medge/s
+  score            2058
 
 HTML5 Browser (32 pages, 800x600 viewport, 3544 DOM elements)
 Single-Core
-  throughput      296.2 pages/s
-  score             456   (baseline 650.0 pages/s = 1000)
+  throughput      288.8 pages/s
+  score             444   (baseline 650.0 pages/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput     1561.6 pages/s
-  score            2402
+  throughput     1915.5 pages/s
+  score            2947
 
 PDF Render (4 park maps, 2 pages each, 1224x1584 px @2x)
 Single-Core
   throughput        3.1 Mpixel/s
-  score             313   (baseline 10.0 Mpixel/s = 1000)
+  score             309   (baseline 10.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
   throughput       13.9 Mpixel/s
-  score            1388
+  score            1387
 
 Clang (32 units, 986328 source tokens)
 Single-Core
-  throughput     4857.2 Ktokens/s
-  score             571   (baseline 8500.0 Ktokens/s = 1000)
+  throughput     4818.7 Ktokens/s
+  score             567   (baseline 8500.0 Ktokens/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput    24860.8 Ktokens/s
-  score            2925
+  throughput    23418.0 Ktokens/s
+  score            2755
 
 Text Processing (32 docs, 8 patterns/doc)
 Single-Core
-  throughput       96.3 MB/s
-  score             481   (baseline 200.0 MB/s = 1000)
+  throughput       95.9 MB/s
+  score             479   (baseline 200.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      505.4 MB/s
-  score            2527
+  throughput      451.5 MB/s
+  score            2257
+
+Photo Filter (10 photos, 1600x1200 px, 6 archetypes)
+Single-Core
+  throughput       28.2 Mpixel/s
+  score             564   (baseline 50.0 Mpixel/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput      156.4 Mpixel/s
+  score            3128
 ```
 
 ## What it measures
@@ -170,6 +184,21 @@ Multi-Core (12 threads, shared task)
   record count and SHA-1 digest of the rendered framebuffer must all
   match exactly; a broken pipeline aborts instead of scoring.
 
+### Photo Filter
+
+- **Metric** — millions of output pixels filtered per second
+  (Mpixel/s): every run filters the whole ten-photo set through all
+  five stages, and the throughput is the exact output-pixel count (ten
+  1600×1200 frames) divided by the wall-clock time, median over the
+  runs. The pixel count is exact and machine-independent, like the
+  corpus size for File Compression.
+- **Score** — `round(throughput / baseline × 1000)`; the baseline is
+  defined in `src/lotofbench.h`.
+- **Correctness** — every photo is verified inside the timed cycle
+  against its prepare-time reference digest: the filtered output's
+  SHA-1 must match exactly; a broken pipeline aborts instead of
+  scoring.
+
 ### PDF Render
 
 - **Metric** — millions of device pixels rasterized per second
@@ -194,7 +223,7 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 63 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 77 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
@@ -219,6 +248,9 @@ src/pdfparse.c                workload #4 kernel — from-scratch PDF reader
 src/pdfrender.c               workload #4 kernel — scanline rasterizer, 4x4 AA
 src/workload_clang.[ch]       workload #6 — units, lexer, parser, codegen
 src/workload_textprocessing.[ch] workload #7 — corpus, regex, Markdown→HTML
+src/workload_photofilter.[ch] workload #13 — photo corpus, filter cycles
+src/imgops.[ch]               shared integer image kernels (blur, levels,
+                              color matrix, crop, bilinear scale)
 src/lz4.[ch]                  LZ4 block-format codec (from scratch, 2 levels)
 src/sha1.[ch]                 SHA-1 for round-trip verification
 src/main.c                    CLI, suite order, output

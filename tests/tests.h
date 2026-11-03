@@ -133,4 +133,22 @@ void test_tp_run_sane(void);
 void test_tp_accessors_null_safe(void);
 void test_tp_golden(void);
 
+/* --- imgops: shared deterministic image kernels ------------------------------------------*/
+void test_img_levels(void);
+void test_img_color_matrix(void);
+void test_img_saturate(void);
+void test_img_box_blur(void);
+void test_img_crop(void);
+void test_img_scale(void);
+
+/* --- workload #13: photo filter ------------------------------------------------------------*/
+void test_pf_photos_deterministic(void);
+void test_pf_input_invariants(void);
+void test_pf_reference_reproducible(void);
+void test_pf_corpus_golden(void);
+void test_pf_seed_variation(void);
+void test_pf_run_sane(void);
+void test_pf_thread_clamp(void);
+void test_pf_accessors_null_safe(void);
+
 #endif /* LOTOFBENCH_TESTS_H */
