@@ -43,13 +43,22 @@ list and implementation status live in
   results and the planted line, Mpixel/s metric) + the shared
   `img_grayscale` and `img_gray_gaussian_blur5` kernels in
   `src/imgops.c`.
+- **v0.9** — Workload #15 Ray Tracer (a seeded synthetic showroom —
+  checker floor, geodesic spheres, boxes, cylinders, chrome/paint/
+  matte materials, three point lights — rendered from eight orbit
+  cameras by a Whitted tracer over a median-split BVH; ambient +
+  Lambert + Phong shading with shadow rays and mirror reflections;
+  every frame verified by SHA-1 digest and exact ray count, BVH vs
+  brute-force differential, Mray/s metric) + the shared integer trig
+  table factored out to `src/itrig.c`.
 
 ## Suggested landing order
 
-1. **#15 Ray Tracer** — Whitted-style tracer + BVH over a synthetic
-   scene; the flagship floating-point workload.
-2. **#5 Photo Library** — box-filter thumbnails + a tiny fixed conv
+1. **#5 Photo Library** — box-filter thumbnails + a tiny fixed conv
    pass + an in-memory record store, reusing the imgops kernels.
+2. **#8 Asset Compression** — a from-scratch BC1-style block codec,
+   the strongest remaining Integer-section workload before composite
+   scoring can aggregate both sections.
 
 ## The remaining Geekbench 6 CPU workloads
 
@@ -78,7 +87,7 @@ the same grouping once it aggregates (see Composite scoring).
 | 12 | Horizon Detection | Canny edges + Hough transform | From-scratch Canny + Hough over synthetic images with known horizons; metric Mpixels/s; verify detected line parameters against ground truth — **implemented v0.8** |
 | 13 | Photo Filter | Color/blur filters, crop, scale | Gaussian/box blur, saturation, crop+scale pipelines over synthetic images; metric Mpixels/s — **implemented v0.7** |
 | 14 | HDR | Blending six 16 MP SDR photos | Simplified exposure-fusion (pyramid blend) over six synthetic exposures; metric Mpixels/s |
-| 15 | Ray Tracer | Blender BMW scene, Embree-style | Whitted-style tracer with a BVH over a deterministic synthetic scene; metric Mrays/s; verify pixel hash |
+| 15 | Ray Tracer | Blender BMW scene, Embree-style | Whitted-style tracer with a BVH over a deterministic synthetic scene; metric Mrays/s; verify pixel hash — **implemented v0.9** |
 | 16 | Structure from Motion | 3D geometry from 2D image pairs | Feature detection (FAST/Harris) + RANSAC essential matrix + triangulation over synthetic correspondences; verify reprojection error; metric pairs/s |
 
 ## Cross-cutting

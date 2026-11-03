@@ -104,6 +104,16 @@ static const test_entry TESTS[] = {
     { "horizon/run-sane", test_hd_run_sane },
     { "horizon/thread-clamp", test_hd_thread_clamp },
     { "horizon/null-accessors", test_hd_accessors_null_safe },
+    /* workload #15 — ray tracer */
+    { "raytracer/scene-deterministic", test_rt_scene_deterministic },
+    { "raytracer/input-invariants", test_rt_input_invariants },
+    { "raytracer/render-differential", test_rt_render_differential },
+    { "raytracer/unit-vectors", test_rt_unit_vectors },
+    { "raytracer/corpus-golden", test_rt_corpus_golden },
+    { "raytracer/seed-variation", test_rt_seed_variation },
+    { "raytracer/run-sane", test_rt_run_sane },
+    { "raytracer/thread-clamp", test_rt_thread_clamp },
+    { "raytracer/null-accessors", test_rt_accessors_null_safe },
     /* workload #13 — photo filter */
     { "photofilter/photos-deterministic", test_pf_photos_deterministic },
     { "photofilter/input-invariants", test_pf_input_invariants },

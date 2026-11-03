@@ -25,6 +25,7 @@
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
 #include "workload_photofilter.h"
+#include "workload_raytracer.h"
 #include "workload_pdfrender.h"
 #include "workload_textprocessing.h"
 
@@ -214,5 +215,27 @@ int main(void)
     printf("\nHD_SEED1_TASK_PIXELS_MULTI %llu",
            (unsigned long long)hd_task_pixels(1));
     hd_free(hd);
+
+    /* ray tracer: seed-1 view 0 reference (frame digest + exact ray
+     * count), the triangle count and the task pixel counts */
+    rt_ctx *rt = rt_prepare(1);
+
+    if (!rt)
+        return 1;
+    {
+        const rt_result *r = rt_reference(rt, 0);
+
+        printf("\nRT_SEED1_VIEW0_REF");
+        for (int i = 0; i < 20; i++)
+            printf(" %02x", r->digest[i]);
+        printf("\nRT_SEED1_VIEW0_RAYS %llu",
+               (unsigned long long)r->rays);
+    }
+    printf("\nRT_SEED1_TRIANGLES %u", (unsigned)rt_tri_count(rt));
+    printf("\nRT_SEED1_TASK_PIXELS %llu",
+           (unsigned long long)rt_task_pixels(0));
+    printf("\nRT_SEED1_TASK_PIXELS_MULTI %llu",
+           (unsigned long long)rt_task_pixels(1));
+    rt_free(rt);
     return 0;
 }
