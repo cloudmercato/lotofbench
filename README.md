@@ -8,11 +8,11 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 8 of 16
+## Status — workload 9 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
-**Clang**, **Text Processing**, **Horizon Detection** and
-**Photo Filter** are implemented (eight of the Geekbench 6 CPU
+**Clang**, **Text Processing**, **Horizon Detection**, **Photo Filter**
+and **Ray Tracer** are implemented (nine of the Geekbench 6 CPU
 workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
@@ -54,6 +54,12 @@ workload list, the roadmap and the suggested landing order live in
   saturation, levels, two-pass box blur, central crop, bilinear
   rescale — built on shared integer image kernels, verify every
   filtered digest, score the megapixel rate.
+- **Ray Tracer** — render eight seeded views of a synthetic showroom
+  (checker floor, geodesic spheres, boxes and cylinders in chrome,
+  paint and matte finishes, three point lights) with a Whitted tracer
+  over a BVH — ambient + Lambert + Phong shading, shadow rays, mirror
+  reflections — verify every frame digest and the exact ray count,
+  score the rays-per-second rate.
 
 ## Build (one command)
 
@@ -78,80 +84,89 @@ map is the map, the pages are the pages) that vary only with `--seed`.
 Real output on the development box (12 threads, defaults):
 
 ```
-LotofBench 0.8.0
+LotofBench 0.9.0
 seed 1, 5 runs, median
 
 File Compression (corpus 100 MB synthetic)
 Single-Core
-  throughput      108.5 MB/s
-  score             434   (baseline 250.0 MB/s = 1000)
+  throughput      107.9 MB/s
+  score             432   (baseline 250.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      666.5 MB/s
-  score            2666
+  throughput      604.9 MB/s
+  score            2419
 
 Navigation (grid 512x512, 64 routes)
 Single-Core
-  throughput       43.9 Medge/s
-  score             439   (baseline 100.0 Medge/s = 1000)
+  throughput       43.5 Medge/s
+  score             435   (baseline 100.0 Medge/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      239.0 Medge/s
-  score            2390
+  throughput      219.5 Medge/s
+  score            2195
 
 HTML5 Browser (32 pages, 800x600 viewport, 3544 DOM elements)
 Single-Core
-  throughput      300.3 pages/s
-  score             462   (baseline 650.0 pages/s = 1000)
+  throughput      291.8 pages/s
+  score             449   (baseline 650.0 pages/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput     1811.6 pages/s
-  score            2787
+  throughput     1772.0 pages/s
+  score            2726
 
 PDF Render (4 park maps, 2 pages each, 1224x1584 px @2x)
 Single-Core
   throughput        3.1 Mpixel/s
-  score             312   (baseline 10.0 Mpixel/s = 1000)
+  score             311   (baseline 10.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput       13.8 Mpixel/s
-  score            1383
+  throughput       14.1 Mpixel/s
+  score            1411
 
 Clang (32 units, 986328 source tokens)
 Single-Core
-  throughput     4844.5 Ktokens/s
-  score             570   (baseline 8500.0 Ktokens/s = 1000)
+  throughput     4786.3 Ktokens/s
+  score             563   (baseline 8500.0 Ktokens/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput    22770.5 Ktokens/s
-  score            2679
+  throughput    23641.5 Ktokens/s
+  score            2781
 
 Text Processing (32 docs, 8 patterns/doc)
 Single-Core
-  throughput       96.0 MB/s
-  score             480   (baseline 200.0 MB/s = 1000)
+  throughput       96.2 MB/s
+  score             481   (baseline 200.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      499.3 MB/s
-  score            2496
+  throughput      439.9 MB/s
+  score            2200
 
 Horizon Detection (8 photos, 1600x1200 px, 6 archetypes, Canny+Hough)
 Single-Core
-  throughput       49.8 Mpixel/s
+  throughput       49.7 Mpixel/s
   score             995   (baseline 50.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      267.7 Mpixel/s
-  score            5354
+  throughput      267.1 Mpixel/s
+  score            5341
 
 Photo Filter (10 photos, 1600x1200 px, 6 archetypes)
 Single-Core
-  throughput       28.6 Mpixel/s
-  score             571   (baseline 50.0 Mpixel/s = 1000)
+  throughput       28.1 Mpixel/s
+  score             562   (baseline 50.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      155.5 Mpixel/s
-  score            3109
+  throughput      145.3 Mpixel/s
+  score            2907
+
+Ray Tracer (8 views, 480x360 px, 984 triangles, Whitted)
+Single-Core
+  throughput        5.2 Mray/s
+  score            1037   (baseline 5.0 Mray/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput       27.0 Mray/s
+  score            5405
 ```
 
 ## What it measures
@@ -231,6 +246,23 @@ Multi-Core (12 threads, shared task)
   SHA-1 must match exactly; a broken pipeline aborts instead of
   scoring.
 
+### Ray Tracer
+
+- **Metric** — millions of traced rays per second (Mray/s): every run
+  re-renders the whole 8-view set through the BVH, and the throughput
+  is the exact ray count (primary + shadow + reflection rays, all
+  counted) divided by the wall-clock time, median over the runs. The
+  count is deterministic — same seed, same count, whatever the machine
+  — so it plays the role the corpus size plays for File Compression.
+- **Score** — `round(throughput / baseline × 1000)`; the baseline is
+  defined in `src/lotofbench.h`.
+- **Correctness** — every view is verified inside the timed cycle
+  against its prepare-time reference: the SHA-1 digest of the frame and
+  the exact ray count must both match, and the BVH renderer is
+  bit-identical to the brute-force renderer by construction (the
+  differential test validates the acceleration structure); a broken
+  tracer aborts instead of scoring.
+
 ### PDF Render
 
 - **Metric** — millions of device pixels rasterized per second
@@ -255,7 +287,7 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 88 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 97 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
@@ -281,6 +313,8 @@ src/pdfrender.c               workload #4 kernel — scanline rasterizer, 4x4 AA
 src/workload_clang.[ch]       workload #6 — units, lexer, parser, codegen
 src/workload_textprocessing.[ch] workload #7 — corpus, regex, Markdown→HTML
 src/workload_horizon.[ch]    workload #12 — photo corpus, Canny + Hough
+src/workload_raytracer.[ch]  workload #15 — showroom, BVH, Whitted tracer
+src/itrig.[ch]               shared integer trig table (0.25-degree bins)
 src/workload_photofilter.[ch] workload #13 — photo corpus, filter cycles
 src/imgops.[ch]               shared integer image kernels (blur, levels,
                               grayscale, Gaussian blur, color matrix,

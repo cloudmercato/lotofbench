@@ -26,10 +26,10 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 9 | Object Detection              | MobileNet v1 SSD over photos       | planned |
 | 10| Background Blur               | DeepLabV3+ segmentation on video frames | planned |
 | 11| Object Remover                | Inpainting (content-aware fill)    | planned |
-| 12| Horizon Detection             | Canny edges + Hough transform      | planned |
+| 12| Horizon Detection             | Canny edges + Hough transform      | **implemented v0.8** |
 | 13| Photo Filter                  | Color/blur filters, crop, scale    | **implemented v0.7** |
 | 14| HDR                           | Blending six 16 MP SDR photos      | planned |
-| 15| Ray Tracer                    | Blender BMW scene, Embree-style    | planned |
+| 15| Ray Tracer                    | Blender BMW scene, Embree-style    | **implemented v0.9** |
 | 16| Structure from Motion         | 3D geometry from 2D image pairs    | planned |
 
 Geekbench also runs GPU compute workloads; they are out of scope for now.
@@ -384,6 +384,53 @@ GB6's per-photo filter choices — the throughput metric (output pixels
 per second) is unaffected because the pixel count is exact and
 machine-independent.
 
+## Workload 15 — Ray Tracer (implemented)
+
+Geekbench 6's Ray Tracer workload renders the Blender Foundation's BMW
+car scene with a custom ray tracer built on the Intel Embree kernels —
+the flagship image-synthesis pass. LotofBench v0.9 reproduces the shape
+dependency-free, bit-identically:
+
+- **Scene**: a seeded synthetic showroom — a 16×16-cell checker floor
+  and six slots filled with seeded primitives: geodesic spheres (an
+  octahedron subdivided twice, smooth radial normals), yaw-rotated
+  boxes and 16-segment cylinders, in chrome, glossy-paint, matte and
+  floor materials, lit by three seeded point lights (white/warm/cool).
+  Every angle enters through the shared integer trig table
+  (`src/itrig.h`); the sphere tessellation needs no transcendental at
+  all. Fixed `--seed` means a bit-identical scene on every machine;
+  generation and the BVH build are off the clock.
+- **Cameras**: eight seeded orbit cameras (480×360 viewport) looking at
+  the middle of the showroom — position from the trig table, radius and
+  height from exact float steps, focal length from a hard-coded tan(30°)
+  double. No libm call anywhere on the image path.
+- **Pipeline**: Whitted shading over a BVH (median split on the longest
+  centroid axis, merge sort tie-broken by index, leaves of at most 4
+  triangles, near-child-first traversal) — per hit: ambient + Lambert
+  diffuse + Phong specular (integer power loop) with one shadow ray per
+  light, plus mirror reflections up to 3 bounces for the chrome, paint
+  and floor materials; a piecewise sky/ground-haze gradient fills the
+  misses. The timed path is float arithmetic restricted to IEEE-exact
+  operations (`+ - * / sqrtf`) under `-ffp-contract=off`, so frames and
+  ray counts are bit-identical across machines.
+- **Verification**: every timed cycle re-renders the whole view set and
+  each frame must reproduce its prepare-time SHA-1 digest AND its exact
+  ray count (primary + shadow + reflection rays are all counted). The
+  BVH renderer and a brute-force renderer (no BVH) are bit-identical by
+  construction — the differential test that validates the acceleration
+  structure. A drift aborts the run instead of scoring.
+- **Cycle**: one run = the whole view set (all rays of all 8 views),
+  timed as a whole with `CLOCK_MONOTONIC`. The multi-core pass renders
+  32 views (4x the set) split across threads.
+
+Known v0.9 divergences from Geekbench 6, all deliberate: a synthetic
+showroom instead of the licensed BMW mesh (~1k triangles instead of
+~140k), one fixed documented shader (ambient/Lambert/Phong + Whitted
+mirrors) instead of Embree's unspecified materials, and a pixel-centre
+primary ray with no jitter or anti-aliasing — the throughput metric
+(rays per second) is unaffected because the ray count is exact and
+machine-independent.
+
 ## Metric
 
 Each run reports a **throughput**, and the workload result is the
@@ -433,6 +480,12 @@ Each run reports a **throughput**, and the workload result is the
   (Mpixel/s). Each photo contributes its exact 1600×1200 output frame
   (19,200,000 pixels per single-core pass); the count is
   machine-independent, like the corpus size for File Compression.
+- **Ray Tracer** — traced rays divided by the wall-clock seconds of the
+  full view set, in millions of rays per second (Mray/s). Every
+  primary, shadow and reflection ray is counted exactly; the count is
+  deterministic (same seed, same count), so it is the ray tracer's
+  analogue of the corpus size. On the default seed the suite traces
+  5,690,792 rays per pass.
 
 ## Scoring
 
@@ -446,7 +499,7 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with eight
+will adopt the same aggregation once more workloads exist; with nine
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
@@ -474,6 +527,9 @@ publishes its own score.
   #13) — the reference machine filters about 50 million output pixels
   per second (the five-stage stack over a 1600×1200 photo in about
   45 ms).
+- `BASELINE_RAYTRACER_MRAYS` = **5.0 Mray/s** = 1000 (workload #15) —
+  the reference machine traces about 5 million rays per second through
+  the BVH (the 8-view pass in about 1.1 s single-core).
 
 ## Multi-core model
 
@@ -504,6 +560,10 @@ LotofBench does the same for every workload:
   thread; each thread runs the full Canny + Hough chain on its photos
   and verifies every detection against the reference results and the
   planted ground truth.
+- **Ray Tracer** — the multi-core pass renders 32 views (4x the
+  single-core set) split into equal contiguous slices, one per thread;
+  each thread traces its views through the BVH and verifies every
+  frame's digest and ray count against the references.
 - **Photo Filter** — the multi-core pass filters 40 photos (4x the
   single-core set) split into equal contiguous slices, one per thread;
   each thread runs all five stages on its photos and verifies every

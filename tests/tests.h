@@ -154,6 +154,17 @@ void test_hd_run_sane(void);
 void test_hd_thread_clamp(void);
 void test_hd_accessors_null_safe(void);
 
+/* --- workload #15: ray tracer ------------------------------------------------*/
+void test_rt_scene_deterministic(void);
+void test_rt_input_invariants(void);
+void test_rt_render_differential(void);
+void test_rt_unit_vectors(void);
+void test_rt_corpus_golden(void);
+void test_rt_seed_variation(void);
+void test_rt_run_sane(void);
+void test_rt_thread_clamp(void);
+void test_rt_accessors_null_safe(void);
+
 /* --- workload #13: photo filter ------------------------------------------------------------*/
 void test_pf_photos_deterministic(void);
 void test_pf_input_invariants(void);

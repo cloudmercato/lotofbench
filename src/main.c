@@ -18,6 +18,7 @@
 #include "workload_pdfrender.h"
 #include "workload_textprocessing.h"
 #include "workload_photofilter.h"
+#include "workload_raytracer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -179,6 +180,18 @@ static int run_hd(hd_ctx *hd, unsigned runs, unsigned threads_req,
     return 0;
 }
 
+static int run_rt(rt_ctx *rt, unsigned runs, unsigned threads_req,
+                  lb_result *out, uint64_t *rays)
+{
+    unsigned t = threads_req;
+
+    if (rt_run(rt, runs, &t, &out->throughput, rays) != 0)
+        return -1;
+    out->threads = t;
+    out->score = lb_score(out->throughput, BASELINE_RAYTRACER_MRAYS);
+    return 0;
+}
+
 /* --- output ------------------------------------------------------------------*/
 
 static void print_block(const char *unit, double baseline,
@@ -209,7 +222,10 @@ static void print_json(const options *opt, const lb_result *fc_single,
                        const lb_result *hd_single,
                        const lb_result *hd_multi, uint64_t hd_pixels,
                        const lb_result *pf_single,
-                       const lb_result *pf_multi, uint64_t pf_pixels)
+                       const lb_result *pf_multi, uint64_t pf_pixels,
+                       const lb_result *rt_single,
+                       const lb_result *rt_multi, uint64_t rt_rays,
+                       unsigned rt_triangles)
 {
     printf("{\n");
     printf("  \"benchmark\": \"lotofbench\",\n");
@@ -297,8 +313,19 @@ static void print_json(const options *opt, const lb_result *fc_single,
            "\"score\": %ld},\n",
            pf_single->threads, pf_single->throughput, pf_single->score);
     printf("     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld}}\n",
+           "\"score\": %ld}},\n",
            pf_multi->threads, pf_multi->throughput, pf_multi->score);
+    printf("    {\"name\": \"%s\", \"views\": %u, \"view\": \"%ux%u\", "
+           "\"triangles\": %u, \"task_rays\": %llu, \"baseline_mrays\": %.1f,\n",
+           RT_WORKLOAD_SLUG, RT_VIEWS, RT_VIEW_W, RT_VIEW_H,
+           rt_triangles, (unsigned long long)rt_rays,
+           BASELINE_RAYTRACER_MRAYS);
+    printf("     \"single\": {\"threads\": %u, \"throughput_mrays\": %.1f, "
+           "\"score\": %ld},\n",
+           rt_single->threads, rt_single->throughput, rt_single->score);
+    printf("     \"multi\": {\"threads\": %u, \"throughput_mrays\": %.1f, "
+           "\"score\": %ld}}\n",
+           rt_multi->threads, rt_multi->throughput, rt_multi->score);
     printf("  ]\n");
     printf("}\n");
 }
@@ -314,8 +341,9 @@ int main(int argc, char **argv)
     tp_ctx *tp = tp_prepare(opt.seed);
     hd_ctx *hd = hd_prepare(opt.seed);
     pf_ctx *pf = pf_prepare(opt.seed);
+    rt_ctx *rt = rt_prepare(opt.seed);
 
-    if (!fc || !nav || !h5 || !pdf || !cl || !tp || !hd || !pf) {
+    if (!fc || !nav || !h5 || !pdf || !cl || !tp || !hd || !pf || !rt) {
         fprintf(stderr,
                 "lotofbench: out of memory building the workload inputs\n");
         fc_free(fc);
@@ -326,6 +354,7 @@ int main(int argc, char **argv)
         tp_free(tp);
         hd_free(hd);
         pf_free(pf);
+        rt_free(rt);
         return 1;
     }
 
@@ -337,8 +366,9 @@ int main(int argc, char **argv)
     lb_result tp_single = { 0, 0.0, 0 }, tp_multi = { 0, 0.0, 0 };
     lb_result hd_single = { 0, 0.0, 0 }, hd_multi = { 0, 0.0, 0 };
     lb_result pf_single = { 0, 0.0, 0 }, pf_multi = { 0, 0.0, 0 };
+    lb_result rt_single = { 0, 0.0, 0 }, rt_multi = { 0, 0.0, 0 };
     uint64_t nav_ops = 0, h5_pages = 0, pdf_pixels = 0, cl_tokens = 0,
-             tp_bytes = 0, hd_pixels = 0, pf_pixels = 0;
+             tp_bytes = 0, hd_pixels = 0, pf_pixels = 0, rt_rays = 0;
 
     if (run_fc(fc, opt.runs, 1, &fc_single) != 0 ||
         run_fc(fc, opt.runs, opt.threads, &fc_multi) != 0 ||
@@ -355,7 +385,9 @@ int main(int argc, char **argv)
         run_hd(hd, opt.runs, 1, &hd_single, &hd_pixels) != 0 ||
         run_hd(hd, opt.runs, opt.threads, &hd_multi, &hd_pixels) != 0 ||
         run_pf(pf, opt.runs, 1, &pf_single, &pf_pixels) != 0 ||
-        run_pf(pf, opt.runs, opt.threads, &pf_multi, &pf_pixels) != 0) {
+        run_pf(pf, opt.runs, opt.threads, &pf_multi, &pf_pixels) != 0 ||
+        run_rt(rt, opt.runs, 1, &rt_single, &rt_rays) != 0 ||
+        run_rt(rt, opt.runs, opt.threads, &rt_multi, &rt_rays) != 0) {
         fprintf(stderr,
                 "lotofbench: workload failed — a result did not verify\n");
         fc_free(fc);
@@ -366,6 +398,7 @@ int main(int argc, char **argv)
         tp_free(tp);
         hd_free(hd);
         pf_free(pf);
+        rt_free(rt);
         return 1;
     }
 
@@ -375,10 +408,12 @@ int main(int argc, char **argv)
                    html5_elements(h5), &pdf_single, &pdf_multi,
                    pdf_pixels, &cl_single, &cl_multi, cl_tokens,
                    &tp_single, &tp_multi, tp_bytes, &hd_single, &hd_multi,
-                   hd_pixels, &pf_single, &pf_multi, pf_pixels);
+                   hd_pixels, &pf_single, &pf_multi, pf_pixels,
+                   &rt_single, &rt_multi, rt_rays,
+                   (unsigned)rt_tri_count(rt));
     } else {
         char fc_cfg[64], nav_cfg[64], h5_cfg[64], pdf_cfg[96], cl_cfg[64],
-             tp_cfg[64], hd_cfg[96], pf_cfg[96];
+             tp_cfg[64], hd_cfg[96], pf_cfg[96], rt_cfg[96];
 
         snprintf(fc_cfg, sizeof(fc_cfg), "corpus %u MB synthetic",
                  opt.corpus_mb);
@@ -400,6 +435,10 @@ int main(int argc, char **argv)
         snprintf(pf_cfg, sizeof(pf_cfg),
                  "%u photos, %ux%u px, 6 archetypes", PF_PHOTOS,
                  PF_PHOTO_W, PF_PHOTO_H);
+        snprintf(rt_cfg, sizeof(rt_cfg),
+                 "%u views, %ux%u px, %u triangles, Whitted",
+                 RT_VIEWS, RT_VIEW_W, RT_VIEW_H,
+                 (unsigned)rt_tri_count(rt));
 
         printf("LotofBench %s\n", LOTOFBENCH_VERSION);
         printf("seed %u, %u runs, median\n\n", opt.seed, opt.runs);
@@ -428,6 +467,9 @@ int main(int argc, char **argv)
         printf("\n%s (%s)\n", PF_WORKLOAD_NAME, pf_cfg);
         print_block("Mpixel/s", BASELINE_PHOTOFILTER_MPIXELS, &pf_single,
                     &pf_multi);
+        printf("\n%s (%s)\n", RT_WORKLOAD_NAME, rt_cfg);
+        print_block("Mray/s", BASELINE_RAYTRACER_MRAYS, &rt_single,
+                    &rt_multi);
     }
 
     fc_free(fc);
@@ -438,5 +480,6 @@ int main(int argc, char **argv)
     tp_free(tp);
     hd_free(hd);
     pf_free(pf);
+    rt_free(rt);
     return 0;
 }
