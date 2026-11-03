@@ -51,12 +51,18 @@ list and implementation status live in
   every frame verified by SHA-1 digest and exact ray count, BVH vs
   brute-force differential, Mray/s metric) + the shared integer trig
   table factored out to `src/itrig.c`.
+- **v0.10** — Workload #5 Photo Library (16 seeded synthetic photos in
+  eight content classes through the import pipeline: a 1/4 / 1/8 / 1/16
+  exact box thumbnail ladder, a fixed 8-filter integer conv pass over
+  the 1/8 thumbnail — the MobileNet stand-in — with nearest-centroid
+  auto-tag that must recover the planted class, and a per-slice
+  in-memory record store with integrity queries — the SQLite
+  stand-in; every thumbnail SHA-1-verified, img/s metric) + the shared
+  `img_box_downscale` kernel in `src/imgops.c`.
 
 ## Suggested landing order
 
-1. **#5 Photo Library** — box-filter thumbnails + a tiny fixed conv
-   pass + an in-memory record store, reusing the imgops kernels.
-2. **#8 Asset Compression** — a from-scratch BC1-style block codec,
+1. **#8 Asset Compression** — a from-scratch BC1-style block codec,
    the strongest remaining Integer-section workload before composite
    scoring can aggregate both sections.
 
@@ -72,7 +78,7 @@ the same grouping once it aggregates (see Composite scoring).
 |---|----------|------------------|---------------------|
 | 3 | HTML5 Browser | HTML parse, CSS layout, render | Dependency-free tokenizer → block layout → scanline "render" over a synthetic DOM tree; metric pages/s or elements/s; verify the rendered pixmap hash — **implemented v0.3** |
 | 4 | PDF Render | PDFium vector rendering | Synthetic vector scene list → bezier flattening, scanline polygon fill, anti-aliasing; metric Mpixels/s; verify pixel hash — **implemented v0.6** |
-| 5 | Photo Library | JPEG decode, thumbnails, MobileNet classify + SQLite | Synthetic images → box-filter thumbnails + a tiny fixed conv pass + an in-memory record store; metric images/s |
+| 5 | Photo Library | JPEG decode, thumbnails, MobileNet classify + SQLite | Synthetic photos → 1/4-1/8-1/16 box thumbnail ladder + fixed 8-filter int conv pass + nearest-centroid auto-tag + in-memory record store; metric images/s; verify thumbnail digests + planted tags — **implemented v0.10** |
 | 6 | Clang | Compiling the Lua interpreter | Lexer/parser/codegen of a small deterministic language subset (no system cc — that would break reproducibility); metric Ktokens/s; verify emitted bytes hash — **implemented v0.4** |
 | 7 | Text Processing | Regex parsing, Markdown→HTML | From-scratch regex engine (NFA or backtracking) + Markdown→HTML subset over synthetic texts; metric MB/s — **implemented v0.5** |
 | 8 | Asset Compression | ASTC/BC7/DXT5 texture codecs, Draco mesh | From-scratch BC1-style block codec over synthetic textures + simple mesh quantization; metric Mpixels/s |

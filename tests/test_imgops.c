@@ -299,3 +299,104 @@ void test_img_scale(void)
         CHECK(memcmp(a, want, 6) == 0);
     }
 }
+
+void test_img_box_downscale(void)
+{
+    /* exact vectors, hand-computed (the /tmp gate runs the same) */
+    {
+        /* 2x2 -> 1x1: mean 127.5 rounds half-up to 128 */
+        uint8_t src[12] = { 0, 0, 0, 255, 255, 255,
+                            255, 255, 255, 0, 0, 0 };
+        uint8_t dst[3];
+
+        img_box_downscale(dst, 1, 1, src, 2, 2);
+        CHECK(dst[0] == 128 && dst[1] == 128 && dst[2] == 128);
+    }
+    {
+        /* 1x1 -> 1x1 identity */
+        uint8_t src[3] = { 7, 8, 9 }, dst[3];
+
+        img_box_downscale(dst, 1, 1, src, 1, 1);
+        CHECK(dst[0] == 7 && dst[1] == 8 && dst[2] == 9);
+    }
+    {
+        /* 4x4 -> 2x2: rows 0-1 are {0,1,2,3}, rows 2-3 all 9. Block
+         * (0,0) = {0,1,0,1} mean 0.5 -> 1; block (1,0) = {2,3,2,3}
+         * mean 2.5 -> 3; bottom blocks stay 9. */
+        uint8_t src[48], dst[12];
+
+        for (int i = 0; i < 16; i++)
+            for (int c = 0; c < 3; c++)
+                src[i * 3 + c] = (uint8_t)(i < 8 ? i % 4 : 9);
+        img_box_downscale(dst, 2, 2, src, 4, 4);
+        CHECK(dst[0] == 1);
+        CHECK(dst[3] == 3);
+        CHECK(dst[6] == 9 && dst[9] == 9);
+    }
+    {
+        /* 3x3 -> 1x1, non-power-of-two ratio: mean 0..8 = 4 exactly */
+        uint8_t src[27], dst[3];
+
+        for (int i = 0; i < 9; i++)
+            for (int c = 0; c < 3; c++)
+                src[i * 3 + c] = (uint8_t)i;
+        img_box_downscale(dst, 1, 1, src, 3, 3);
+        CHECK(dst[0] == 4 && dst[1] == 4 && dst[2] == 4);
+    }
+    {
+        /* constant image at every ratio of the photo ladder */
+        uint8_t src[1280 * 960 * 3], t0[320 * 240 * 3];
+        uint8_t t1[160 * 120 * 3], t2[80 * 60 * 3];
+        int ok = 1;
+
+        memset(src, 0xC7, sizeof src);
+        img_box_downscale(t0, 320, 240, src, 1280, 960);
+        img_box_downscale(t1, 160, 120, src, 1280, 960);
+        img_box_downscale(t2, 80, 60, src, 1280, 960);
+        for (size_t i = 0; i < sizeof t0; i++)
+            if (t0[i] != 0xC7) ok = 0;
+        for (size_t i = 0; i < sizeof t1; i++)
+            if (t1[i] != 0xC7) ok = 0;
+        for (size_t i = 0; i < sizeof t2; i++)
+            if (t2[i] != 0xC7) ok = 0;
+        CHECK(ok);
+    }
+    {
+        /* differential vs an independent per-window recomputation on
+         * pseudo-random buffers, assorted ratio pairs */
+        static const size_t cases[5][4] = {
+            { 64, 48, 16, 12 }, { 32, 32, 8, 8 }, { 40, 20, 20, 10 },
+            { 16, 16, 2, 2 }, { 100, 60, 25, 15 },
+        };
+        uint8_t src[100 * 60 * 3], a[25 * 15 * 3], b[25 * 15 * 3];
+        uint64_t state = 777;
+
+        for (unsigned ci = 0; ci < 5; ci++) {
+            size_t sw = cases[ci][0], sh = cases[ci][1];
+            size_t dw = cases[ci][2], dh = cases[ci][3];
+
+            for (size_t i = 0; i < sw * sh * 3; i++) {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                src[i] = (uint8_t)(state >> 32);
+            }
+            img_box_downscale(a, dw, dh, src, sw, sh);
+            for (size_t y = 0; y < dh; y++)
+                for (size_t x = 0; x < dw; x++)
+                    for (int c = 0; c < 3; c++) {
+                        uint32_t sum = 0, area =
+                            (uint32_t)((sw / dw) * (sh / dh));
+
+                        for (size_t yy = y * (sh / dh);
+                             yy < (y + 1) * (sh / dh); yy++)
+                            for (size_t xx = x * (sw / dw);
+                                 xx < (x + 1) * (sw / dw); xx++)
+                                sum += src[(yy * sw + xx) * 3 + c];
+                        b[(y * dw + x) * 3 + c] =
+                            (uint8_t)((sum + area / 2) / area);
+                    }
+            CHECK(memcmp(a, b, dw * dh * 3) == 0);
+        }
+    }
+}

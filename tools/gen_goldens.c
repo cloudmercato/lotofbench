@@ -15,6 +15,7 @@
  */
 
 #include "harness.h"
+#include "imgops.h"
 #include "lotofbench.h"
 #include "lz4.h"
 #include "rng.h"
@@ -25,12 +26,18 @@
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
 #include "workload_photofilter.h"
+#include "workload_photolibrary.h"
 #include "workload_raytracer.h"
 #include "workload_pdfrender.h"
 #include "workload_textprocessing.h"
 
 #include <stdio.h>
 #include <string.h>
+
+/* scratch for the photo-library feature rebuild (constant sizes) */
+#define PL_SCRATCH_BYTES \
+    (PL_FEATURE_DIMS * PL_CLS_W * PL_CLS_H + \
+     PL_FEATURE_DIMS * (PL_CLS_W / 2) * (PL_CLS_H / 2))
 
 int main(void)
 {
@@ -127,6 +134,44 @@ int main(void)
         pdf_ops += pdf_doc_ops(pdf, d);
     printf("\nPDF_SEED1_TOTAL_OPS %llu", (unsigned long long)pdf_ops);
     pdf_free(pdf);
+
+    /* photo library: seed-1 photo 0 source digest, its three reference
+     * thumbnail digests, its feature vector through the public kernels,
+     * the class-0 centroid, and the task photo counts */
+    {
+        static uint8_t pl_t1[PL_THUMB1_W * PL_THUMB1_H * 3];
+        static uint8_t pl_scr[PL_SCRATCH_BYTES];
+        uint16_t feat[PL_FEATURE_DIMS];
+        pl_ctx *pl = pl_prepare(1);
+
+        if (!pl)
+            return 1;
+        sha1_hex(pl_photo(pl, 0), pl_photo_len(pl, 0), hex);
+        printf("\nPL_SEED1_PHOTO0_SHA1 %s len=%zu", hex,
+               pl_photo_len(pl, 0));
+        for (unsigned t = 0; t < PL_THUMBS; t++) {
+            const uint8_t *d = pl_reference_digest(pl, 0, t);
+
+            printf("\nPL_SEED1_PHOTO0_THUMB%u", t);
+            for (int i = 0; i < 20; i++)
+                printf(" %02x", d[i]);
+        }
+        img_box_downscale(pl_t1, PL_CLS_W, PL_CLS_H, pl_photo(pl, 0),
+                          PL_PHOTO_W, PL_PHOTO_H);
+        pl_extract_features(pl_t1, PL_CLS_W, PL_CLS_H, feat, pl_scr);
+        printf("\nPL_SEED1_PHOTO0_FEAT");
+        for (unsigned k = 0; k < PL_FEATURE_DIMS; k++)
+            printf(" %u", feat[k]);
+        printf("\nPL_SEED1_CENTROID0");
+        for (unsigned k = 0; k < PL_FEATURE_DIMS; k++)
+            printf(" %u", pl_class_centroid(pl, 0)[k]);
+        printf("\nPL_SEED1_TASK_PHOTOS %llu",
+               (unsigned long long)pl_task_photos(0));
+        printf("\nPL_SEED1_TASK_PHOTOS_MULTI %llu",
+               (unsigned long long)pl_task_photos(1));
+        pl_free(pl);
+    }
+
     /* clang goldens (seed 1): unit 0 (call-graph archetype) source and
      * bytecode, and the corpus token total */
     cl_ctx *cl = cl_prepare(1);

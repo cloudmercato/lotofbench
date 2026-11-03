@@ -8,12 +8,12 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 9 of 16
+## Status — workload 10 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
-**Clang**, **Text Processing**, **Horizon Detection**, **Photo Filter**
-and **Ray Tracer** are implemented (nine of the Geekbench 6 CPU
-workloads). The full
+**Photo Library**, **Clang**, **Text Processing**, **Horizon Detection**,
+**Photo Filter** and **Ray Tracer** are implemented (ten of the
+Geekbench 6 CPU workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
@@ -34,6 +34,13 @@ workload list, the roadmap and the suggested landing order live in
   parser and a 4x4 anti-aliased scanline renderer (fills, strokes,
   dashes, clipping, CMYK), verify every pixel digest, score the
   megapixel rate.
+- **Photo Library** — ingest 16 seeded synthetic photos (eight content
+  classes, 1280×960 px) through the import pipeline: an exact box
+  1/4 / 1/8 / 1/16 thumbnail ladder, a fixed eight-filter integer conv
+  pass over the 1/8 thumbnail with nearest-centroid auto-tagging, and
+  an in-memory record store with integrity queries, verify every
+  thumbnail digest and the planted tags, score the photos-per-second
+  rate.
 - **Clang** — lex, parse and compile 32 seeded synthetic translation
   units (a Lua-flavoured subset, six archetype families) to bytecode
   with a from-scratch lexer, recursive-descent parser and code
@@ -84,7 +91,7 @@ map is the map, the pages are the pages) that vary only with `--seed`.
 Real output on the development box (12 threads, defaults):
 
 ```
-LotofBench 0.9.0
+LotofBench 0.10.0
 seed 1, 5 runs, median
 
 File Compression (corpus 100 MB synthetic)
@@ -122,6 +129,15 @@ Single-Core
 Multi-Core (12 threads, shared task)
   throughput       14.1 Mpixel/s
   score            1411
+
+Photo Library (16 photos, 1280x960 px, 8 classes)
+Single-Core
+  throughput      195.6 img/s
+  score             978   (baseline 200.0 img/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput      895.4 img/s
+  score            4477
 
 Clang (32 units, 986328 source tokens)
 Single-Core
@@ -280,6 +296,23 @@ Multi-Core (12 threads, shared task)
   the operator count must all match exactly; any mismatch aborts
   instead of scoring.
 
+### Photo Library
+
+- **Metric** — photos ingested per second (img/s): every run re-imports
+  the whole 16-photo set through the pipeline (thumbnail ladder, conv
+  pass + auto-tag, record store), and the throughput is the exact photo
+  count divided by the wall-clock time, median over the runs. The photo
+  count is exact and machine-independent, like the corpus size for File
+  Compression.
+- **Score** — `round(throughput / baseline × 1000)`; the baseline
+  (200.0 img/s = 1000, i.e. a 1280×960 photo in about 5 ms) is defined
+  in `src/lotofbench.h`.
+- **Correctness** — every photo is imported inside the timed cycle and
+  verified on the way: the three thumbnail digests must match the
+  prepare-time references, the auto-tag must recover the planted class,
+  and the store's count and per-field queries must hold; any mismatch
+  aborts instead of scoring.
+
 ## Tests
 
 ```sh
@@ -287,7 +320,7 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 97 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 107 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
@@ -310,6 +343,8 @@ src/workload_html5browser.[ch] workload #3 — pages, tokenizer, layout, raster
 src/workload_pdfrender.[ch]   workload #4 — park-map PDF corpus, cycles
 src/pdfparse.c                workload #4 kernel — from-scratch PDF reader
 src/pdfrender.c               workload #4 kernel — scanline rasterizer, 4x4 AA
+src/workload_photolibrary.[ch]  workload #5 — photo corpus, thumbnail ladder,
+                                conv + auto-tag, record store
 src/workload_clang.[ch]       workload #6 — units, lexer, parser, codegen
 src/workload_textprocessing.[ch] workload #7 — corpus, regex, Markdown→HTML
 src/workload_horizon.[ch]    workload #12 — photo corpus, Canny + Hough
@@ -318,7 +353,7 @@ src/itrig.[ch]               shared integer trig table (0.25-degree bins)
 src/workload_photofilter.[ch] workload #13 — photo corpus, filter cycles
 src/imgops.[ch]               shared integer image kernels (blur, levels,
                               grayscale, Gaussian blur, color matrix,
-                              crop, bilinear scale)
+                              crop, bilinear scale, box downscale)
 src/lz4.[ch]                  LZ4 block-format codec (from scratch, 2 levels)
 src/sha1.[ch]                 SHA-1 for round-trip verification
 src/main.c                    CLI, suite order, output

@@ -64,6 +64,16 @@ static const test_entry TESTS[] = {
     { "pdf/run-sane", test_pdf_run_sane },
     { "pdf/thread-clamp", test_pdf_thread_clamp },
     { "pdf/null-accessors", test_pdf_accessors_null_safe },
+    /* workload #5 — photo library */
+    { "photo-library/corpus-deterministic", test_pl_corpus_deterministic },
+    { "photo-library/input-invariants", test_pl_input_invariants },
+    { "photo-library/classify-planted", test_pl_classify_planted },
+    { "photo-library/pipeline-units", test_pl_pipeline_units },
+    { "photo-library/seed-variation", test_pl_seed_variation },
+    { "photo-library/run-sane", test_pl_run_sane },
+    { "photo-library/thread-clamp", test_pl_thread_clamp },
+    { "photo-library/null-accessors", test_pl_accessors_null_safe },
+    { "photo-library/golden-v0.10", test_pl_golden },
     /* workload #6 — clang */
     { "clang/units-deterministic", test_cl_units_deterministic },
     { "clang/input-invariants", test_cl_input_invariants },
@@ -94,6 +104,7 @@ static const test_entry TESTS[] = {
     { "imgops/gray-gaussian-blur5", test_img_gray_gaussian_blur5 },
     { "imgops/crop", test_img_crop },
     { "imgops/scale", test_img_scale },
+    { "imgops/box-downscale", test_img_box_downscale },
     /* workload #12 — horizon detection */
     { "horizon/photos-deterministic", test_hd_photos_deterministic },
     { "horizon/input-invariants", test_hd_input_invariants },

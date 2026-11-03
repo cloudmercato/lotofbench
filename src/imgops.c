@@ -262,3 +262,37 @@ void img_scale_bilinear(uint8_t *dst, size_t dw, size_t dh,
         }
     }
 }
+
+void img_box_downscale(uint8_t *dst, size_t dw, size_t dh,
+                       const uint8_t *src, size_t sw, size_t sh)
+{
+    /* Block mean, half-up. The per-channel accumulator is bounded by
+     * 255 * sx * sy; sx, sy <= 16 in the workloads (max 255 * 256 =
+     * 65280), so uint32 never overflows even for large dx * dy. */
+    size_t sx = sw / dw, sy = sh / dh;
+    uint32_t area = (uint32_t)(sx * sy);
+    uint32_t half = area / 2;
+
+    for (size_t y = 0; y < dh; y++) {
+        for (size_t x = 0; x < dw; x++) {
+            uint32_t acc0 = 0, acc1 = 0, acc2 = 0;
+
+            for (size_t yy = 0; yy < sy; yy++) {
+                const uint8_t *row =
+                    src + ((y * sy + yy) * sw + x * sx) * 3;
+
+                for (size_t xx = 0; xx < sx; xx++) {
+                    acc0 += row[xx * 3 + 0];
+                    acc1 += row[xx * 3 + 1];
+                    acc2 += row[xx * 3 + 2];
+                }
+            }
+            dst[(y * dw + x) * 3 + 0] =
+                (uint8_t)((acc0 + half) / area);
+            dst[(y * dw + x) * 3 + 1] =
+                (uint8_t)((acc1 + half) / area);
+            dst[(y * dw + x) * 3 + 2] =
+                (uint8_t)((acc2 + half) / area);
+        }
+    }
+}

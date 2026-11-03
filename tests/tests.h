@@ -111,6 +111,16 @@ void test_pdf_seed_variation(void);
 void test_pdf_run_sane(void);
 void test_pdf_thread_clamp(void);
 void test_pdf_accessors_null_safe(void);
+/* --- workload #5: photo library ------------------------------------------------------------*/
+void test_pl_corpus_deterministic(void);
+void test_pl_input_invariants(void);
+void test_pl_classify_planted(void);
+void test_pl_pipeline_units(void);
+void test_pl_seed_variation(void);
+void test_pl_run_sane(void);
+void test_pl_thread_clamp(void);
+void test_pl_accessors_null_safe(void);
+void test_pl_golden(void);
 /* --- workload #6: clang -----------------------------------------------------------------*/
 void test_cl_units_deterministic(void);
 void test_cl_input_invariants(void);
@@ -142,6 +152,7 @@ void test_img_grayscale(void);
 void test_img_gray_gaussian_blur5(void);
 void test_img_crop(void);
 void test_img_scale(void);
+void test_img_box_downscale(void);
 
 /* --- workload #12: horizon detection ---------------------------------------------------------*/
 void test_hd_photos_deterministic(void);
