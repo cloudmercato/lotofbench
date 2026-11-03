@@ -21,6 +21,7 @@
 #include "sha1.h"
 #include "workload_clang.h"
 #include "workload_compression.h"
+#include "workload_horizon.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
 #include "workload_photofilter.h"
@@ -187,5 +188,31 @@ int main(void)
     printf("\nPF_SEED1_TASK_PIXELS_MULTI %llu",
            (unsigned long long)pf_task_pixels(1));
     pf_free(pf);
+
+    /* horizon detection: seed-1 photo 0 source digest, its reference
+     * detection (edge digest + cell + votes) and the task pixel counts */
+    hd_ctx *hd = hd_prepare(1);
+
+    if (!hd)
+        return 1;
+    sha1_hex(hd_photo(hd, 0), hd_photo_len(hd, 0), hex);
+    printf("\nHD_SEED1_PHOTO0_SHA1 %s len=%zu", hex, hd_photo_len(hd, 0));
+    {
+        const hd_result *r = hd_reference(hd, 0);
+
+        printf("\nHD_SEED1_PHOTO0_REF");
+        for (int i = 0; i < 20; i++)
+            printf(" %02x", r->edge_digest[i]);
+        printf("\nHD_SEED1_PHOTO0_CELL theta=%u rho=%d votes=%u",
+               r->theta_bin, r->rho_bin, r->votes);
+        printf("\nHD_SEED1_PHOTO0_PLANT cx=%d cy=%d slope=%d",
+               hd_plant_cx(hd, 0), hd_plant_cy(hd, 0),
+               hd_plant_slope(hd, 0));
+    }
+    printf("\nHD_SEED1_TASK_PIXELS %llu",
+           (unsigned long long)hd_task_pixels(0));
+    printf("\nHD_SEED1_TASK_PIXELS_MULTI %llu",
+           (unsigned long long)hd_task_pixels(1));
+    hd_free(hd);
     return 0;
 }

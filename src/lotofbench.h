@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.7.0"
+#define LOTOFBENCH_VERSION   "0.8.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -25,6 +25,8 @@
 #define TP_WORKLOAD_SLUG     "text-processing"
 #define PF_WORKLOAD_NAME     "Photo Filter"
 #define PF_WORKLOAD_SLUG     "photo-filter"
+#define HD_WORKLOAD_NAME     "Horizon Detection"
+#define HD_WORKLOAD_SLUG     "horizon-detection"
 
 /* Suite and harness defaults — all overridable on the command line
  * (except the thread cap). */
@@ -75,6 +77,12 @@
  * 1000-point reference machine filters 50.0 million pixels per second
  * (a full photo through all five stages in ~37 ms). */
 #define BASELINE_PHOTOFILTER_MPIXELS  50.0
+
+/* Workload #12 — Horizon Detection: millions of input pixels processed
+ * per second (each photo runs the full grayscale -> Canny -> Hough
+ * pipeline). The 1000-point reference machine processes 50.0 million
+ * pixels per second (the 8-photo set in ~307 ms, ~38 ms per photo). */
+#define BASELINE_HORIZONDETECTION_MPIXELS 50.0
 
 /* One published workload result (single- or multi-core). */
 typedef struct {

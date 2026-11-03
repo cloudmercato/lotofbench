@@ -36,6 +36,18 @@ void img_saturate(uint8_t *img, size_t w, size_t h, int32_t s);
 void img_box_blur(uint8_t *img, size_t w, size_t h, unsigned r,
                   uint8_t *scratch);
 
+/* Convert an RGB888 image to single-channel Rec.601 luma (weights
+ * 77/150/29 in 8.8, sum 256, half-up rounding). dst holds w * h bytes;
+ * src and dst must not alias. */
+void img_grayscale(const uint8_t *rgb, size_t w, size_t h, uint8_t *gray);
+
+/* Separable [1 4 6 4 1]/16 Gaussian blur (two passes, sigma ~ 1.4 px) of
+ * a single-channel image, in place, with a caller-provided scratch
+ * buffer of at least w * h bytes. Edge-clamped windows, half-up
+ * rounding. The smoothing stage of a Canny edge pipeline. */
+void img_gray_gaussian_blur5(uint8_t *img, size_t w, size_t h,
+                             uint8_t *scratch);
+
 /* Extract the (cw x ch) rectangle at (x, y) of src into dst (packed
  * rows). Caller guarantees the rectangle is inside the source. */
 void img_crop(uint8_t *dst, size_t dw,

@@ -8,11 +8,12 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 7 of 16
+## Status — workload 8 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
-**Clang**, **Text Processing** and **Photo Filter** are implemented
-(seven of the Geekbench 6 CPU workloads). The full
+**Clang**, **Text Processing**, **Horizon Detection** and
+**Photo Filter** are implemented (eight of the Geekbench 6 CPU
+workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
@@ -42,6 +43,12 @@ workload list, the roadmap and the suggested landing order live in
   from-scratch backtracking engine, convert every document to HTML
   with a from-scratch Markdown converter, verify every match count
   and every HTML digest, score the bytes-processed rate.
+- **Horizon Detection** — detect the horizon in eight seeded synthetic
+  photos (six archetype families, 1600×1200 px, planted ground-truth
+  boundary) through the full Canny chain — grayscale, separable
+  Gaussian blur, Sobel, non-maximum suppression, hysteresis — then a
+  0.25°-bin Hough transform, verify every detection against the
+  reference results and the planted line, score the megapixel rate.
 - **Photo Filter** — filter ten seeded synthetic photos (six archetype
   families, 1600×1200 px) through a fixed five-stage stack —
   saturation, levels, two-pass box blur, central crop, bilinear
@@ -71,71 +78,80 @@ map is the map, the pages are the pages) that vary only with `--seed`.
 Real output on the development box (12 threads, defaults):
 
 ```
-LotofBench 0.7.0
+LotofBench 0.8.0
 seed 1, 5 runs, median
 
 File Compression (corpus 100 MB synthetic)
 Single-Core
-  throughput      104.1 MB/s
-  score             416   (baseline 250.0 MB/s = 1000)
+  throughput      108.5 MB/s
+  score             434   (baseline 250.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      564.0 MB/s
-  score            2256
+  throughput      666.5 MB/s
+  score            2666
 
 Navigation (grid 512x512, 64 routes)
 Single-Core
-  throughput       41.3 Medge/s
-  score             413   (baseline 100.0 Medge/s = 1000)
+  throughput       43.9 Medge/s
+  score             439   (baseline 100.0 Medge/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      205.8 Medge/s
-  score            2058
+  throughput      239.0 Medge/s
+  score            2390
 
 HTML5 Browser (32 pages, 800x600 viewport, 3544 DOM elements)
 Single-Core
-  throughput      288.8 pages/s
-  score             444   (baseline 650.0 pages/s = 1000)
+  throughput      300.3 pages/s
+  score             462   (baseline 650.0 pages/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput     1915.5 pages/s
-  score            2947
+  throughput     1811.6 pages/s
+  score            2787
 
 PDF Render (4 park maps, 2 pages each, 1224x1584 px @2x)
 Single-Core
   throughput        3.1 Mpixel/s
-  score             309   (baseline 10.0 Mpixel/s = 1000)
+  score             312   (baseline 10.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput       13.9 Mpixel/s
-  score            1387
+  throughput       13.8 Mpixel/s
+  score            1383
 
 Clang (32 units, 986328 source tokens)
 Single-Core
-  throughput     4818.7 Ktokens/s
-  score             567   (baseline 8500.0 Ktokens/s = 1000)
+  throughput     4844.5 Ktokens/s
+  score             570   (baseline 8500.0 Ktokens/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput    23418.0 Ktokens/s
-  score            2755
+  throughput    22770.5 Ktokens/s
+  score            2679
 
 Text Processing (32 docs, 8 patterns/doc)
 Single-Core
-  throughput       95.9 MB/s
-  score             479   (baseline 200.0 MB/s = 1000)
+  throughput       96.0 MB/s
+  score             480   (baseline 200.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      451.5 MB/s
-  score            2257
+  throughput      499.3 MB/s
+  score            2496
+
+Horizon Detection (8 photos, 1600x1200 px, 6 archetypes, Canny+Hough)
+Single-Core
+  throughput       49.8 Mpixel/s
+  score             995   (baseline 50.0 Mpixel/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput      267.7 Mpixel/s
+  score            5354
 
 Photo Filter (10 photos, 1600x1200 px, 6 archetypes)
 Single-Core
-  throughput       28.2 Mpixel/s
-  score             564   (baseline 50.0 Mpixel/s = 1000)
+  throughput       28.6 Mpixel/s
+  score             571   (baseline 50.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      156.4 Mpixel/s
-  score            3128
+  throughput      155.5 Mpixel/s
+  score            3109
 ```
 
 ## What it measures
@@ -184,6 +200,22 @@ Multi-Core (12 threads, shared task)
   record count and SHA-1 digest of the rendered framebuffer must all
   match exactly; a broken pipeline aborts instead of scoring.
 
+### Horizon Detection
+
+- **Metric** — millions of input pixels detected per second
+  (Mpixel/s): every run runs the whole photo set through the full
+  Canny chain and Hough transform, and the throughput is the exact
+  input-pixel count (eight 1600×1200 frames) divided by the wall-clock
+  time, median over the runs. The pixel count is exact and
+  machine-independent, like the corpus size for File Compression.
+- **Score** — `round(throughput / baseline × 1000)`; the baseline is
+  defined in `src/lotofbench.h`.
+- **Correctness** — every photo is detected inside the timed cycle and
+  verified twice: the detection must reproduce the prepare-time
+  reference result bit-for-bit, and it must match the planted ground
+  truth (normal within 1°, rho within 3 px, above the vote floor); a
+  broken pipeline aborts instead of scoring.
+
 ### Photo Filter
 
 - **Metric** — millions of output pixels filtered per second
@@ -223,7 +255,7 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 77 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 88 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
@@ -248,9 +280,11 @@ src/pdfparse.c                workload #4 kernel — from-scratch PDF reader
 src/pdfrender.c               workload #4 kernel — scanline rasterizer, 4x4 AA
 src/workload_clang.[ch]       workload #6 — units, lexer, parser, codegen
 src/workload_textprocessing.[ch] workload #7 — corpus, regex, Markdown→HTML
+src/workload_horizon.[ch]    workload #12 — photo corpus, Canny + Hough
 src/workload_photofilter.[ch] workload #13 — photo corpus, filter cycles
 src/imgops.[ch]               shared integer image kernels (blur, levels,
-                              color matrix, crop, bilinear scale)
+                              grayscale, Gaussian blur, color matrix,
+                              crop, bilinear scale)
 src/lz4.[ch]                  LZ4 block-format codec (from scratch, 2 levels)
 src/sha1.[ch]                 SHA-1 for round-trip verification
 src/main.c                    CLI, suite order, output

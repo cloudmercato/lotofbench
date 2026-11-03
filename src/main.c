@@ -12,6 +12,7 @@
 #include "lotofbench.h"
 #include "workload_clang.h"
 #include "workload_compression.h"
+#include "workload_horizon.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
 #include "workload_pdfrender.h"
@@ -165,6 +166,19 @@ static int run_pf(pf_ctx *pf, unsigned runs, unsigned threads_req,
     return 0;
 }
 
+static int run_hd(hd_ctx *hd, unsigned runs, unsigned threads_req,
+                  lb_result *out, uint64_t *pixels)
+{
+    unsigned t = threads_req;
+
+    if (hd_run(hd, runs, &t, &out->throughput, pixels) != 0)
+        return -1;
+    out->threads = t;
+    out->score = lb_score(out->throughput,
+                          BASELINE_HORIZONDETECTION_MPIXELS);
+    return 0;
+}
+
 /* --- output ------------------------------------------------------------------*/
 
 static void print_block(const char *unit, double baseline,
@@ -192,6 +206,8 @@ static void print_json(const options *opt, const lb_result *fc_single,
                        const lb_result *cl_multi, uint64_t cl_tokens,
                        const lb_result *tp_single,
                        const lb_result *tp_multi, uint64_t tp_bytes,
+                       const lb_result *hd_single,
+                       const lb_result *hd_multi, uint64_t hd_pixels,
                        const lb_result *pf_single,
                        const lb_result *pf_multi, uint64_t pf_pixels)
 {
@@ -264,6 +280,17 @@ static void print_json(const options *opt, const lb_result *fc_single,
            tp_multi->threads, tp_multi->throughput, tp_multi->score);
     printf("    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
            "\"task_pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
+           HD_WORKLOAD_SLUG, HD_PHOTOS, HD_PHOTO_W, HD_PHOTO_H,
+           (unsigned long long)hd_pixels,
+           BASELINE_HORIZONDETECTION_MPIXELS);
+    printf("     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+           "\"score\": %ld},\n",
+           hd_single->threads, hd_single->throughput, hd_single->score);
+    printf("     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+           "\"score\": %ld}},\n",
+           hd_multi->threads, hd_multi->throughput, hd_multi->score);
+    printf("    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
+           "\"task_pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
            PF_WORKLOAD_SLUG, PF_PHOTOS, PF_PHOTO_W, PF_PHOTO_H,
            (unsigned long long)pf_pixels, BASELINE_PHOTOFILTER_MPIXELS);
     printf("     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
@@ -285,9 +312,10 @@ int main(int argc, char **argv)
     pdf_ctx *pdf = pdf_prepare(opt.seed);
     cl_ctx *cl = cl_prepare(opt.seed);
     tp_ctx *tp = tp_prepare(opt.seed);
+    hd_ctx *hd = hd_prepare(opt.seed);
     pf_ctx *pf = pf_prepare(opt.seed);
 
-    if (!fc || !nav || !h5 || !pdf || !cl || !tp || !pf) {
+    if (!fc || !nav || !h5 || !pdf || !cl || !tp || !hd || !pf) {
         fprintf(stderr,
                 "lotofbench: out of memory building the workload inputs\n");
         fc_free(fc);
@@ -296,6 +324,7 @@ int main(int argc, char **argv)
         pdf_free(pdf);
         cl_free(cl);
         tp_free(tp);
+        hd_free(hd);
         pf_free(pf);
         return 1;
     }
@@ -306,9 +335,10 @@ int main(int argc, char **argv)
     lb_result pdf_single = { 0, 0.0, 0 }, pdf_multi = { 0, 0.0, 0 };
     lb_result cl_single = { 0, 0.0, 0 }, cl_multi = { 0, 0.0, 0 };
     lb_result tp_single = { 0, 0.0, 0 }, tp_multi = { 0, 0.0, 0 };
+    lb_result hd_single = { 0, 0.0, 0 }, hd_multi = { 0, 0.0, 0 };
     lb_result pf_single = { 0, 0.0, 0 }, pf_multi = { 0, 0.0, 0 };
     uint64_t nav_ops = 0, h5_pages = 0, pdf_pixels = 0, cl_tokens = 0,
-             tp_bytes = 0, pf_pixels = 0;
+             tp_bytes = 0, hd_pixels = 0, pf_pixels = 0;
 
     if (run_fc(fc, opt.runs, 1, &fc_single) != 0 ||
         run_fc(fc, opt.runs, opt.threads, &fc_multi) != 0 ||
@@ -322,6 +352,8 @@ int main(int argc, char **argv)
         run_cl(cl, opt.runs, opt.threads, &cl_multi, &cl_tokens) != 0 ||
         run_tp(tp, opt.runs, 1, &tp_single, &tp_bytes) != 0 ||
         run_tp(tp, opt.runs, opt.threads, &tp_multi, &tp_bytes) != 0 ||
+        run_hd(hd, opt.runs, 1, &hd_single, &hd_pixels) != 0 ||
+        run_hd(hd, opt.runs, opt.threads, &hd_multi, &hd_pixels) != 0 ||
         run_pf(pf, opt.runs, 1, &pf_single, &pf_pixels) != 0 ||
         run_pf(pf, opt.runs, opt.threads, &pf_multi, &pf_pixels) != 0) {
         fprintf(stderr,
@@ -332,6 +364,7 @@ int main(int argc, char **argv)
         pdf_free(pdf);
         cl_free(cl);
         tp_free(tp);
+        hd_free(hd);
         pf_free(pf);
         return 1;
     }
@@ -341,11 +374,11 @@ int main(int argc, char **argv)
                    nav_ops, &h5_single, &h5_multi, h5_pages,
                    html5_elements(h5), &pdf_single, &pdf_multi,
                    pdf_pixels, &cl_single, &cl_multi, cl_tokens,
-                   &tp_single, &tp_multi, tp_bytes, &pf_single, &pf_multi,
-                   pf_pixels);
+                   &tp_single, &tp_multi, tp_bytes, &hd_single, &hd_multi,
+                   hd_pixels, &pf_single, &pf_multi, pf_pixels);
     } else {
         char fc_cfg[64], nav_cfg[64], h5_cfg[64], pdf_cfg[96], cl_cfg[64],
-             tp_cfg[64], pf_cfg[96];
+             tp_cfg[64], hd_cfg[96], pf_cfg[96];
 
         snprintf(fc_cfg, sizeof(fc_cfg), "corpus %u MB synthetic",
                  opt.corpus_mb);
@@ -361,6 +394,9 @@ int main(int argc, char **argv)
                  CLANG_UNITS, (unsigned long long)cl_tokens);
         snprintf(tp_cfg, sizeof(tp_cfg),
                  "%u docs, %u patterns/doc", TP_DOCS, TP_PATTERNS);
+        snprintf(hd_cfg, sizeof(hd_cfg),
+                 "%u photos, %ux%u px, 6 archetypes, Canny+Hough",
+                 HD_PHOTOS, HD_PHOTO_W, HD_PHOTO_H);
         snprintf(pf_cfg, sizeof(pf_cfg),
                  "%u photos, %ux%u px, 6 archetypes", PF_PHOTOS,
                  PF_PHOTO_W, PF_PHOTO_H);
@@ -386,6 +422,9 @@ int main(int argc, char **argv)
         printf("\n%s (%s)\n", TP_WORKLOAD_NAME, tp_cfg);
         print_block("MB/s", BASELINE_TEXTPROCESSING_MBPS, &tp_single,
                     &tp_multi);
+        printf("\n%s (%s)\n", HD_WORKLOAD_NAME, hd_cfg);
+        print_block("Mpixel/s", BASELINE_HORIZONDETECTION_MPIXELS,
+                    &hd_single, &hd_multi);
         printf("\n%s (%s)\n", PF_WORKLOAD_NAME, pf_cfg);
         print_block("Mpixel/s", BASELINE_PHOTOFILTER_MPIXELS, &pf_single,
                     &pf_multi);
@@ -397,6 +436,7 @@ int main(int argc, char **argv)
     pdf_free(pdf);
     cl_free(cl);
     tp_free(tp);
+    hd_free(hd);
     pf_free(pf);
     return 0;
 }

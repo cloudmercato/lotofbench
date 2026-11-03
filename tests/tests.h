@@ -138,8 +138,21 @@ void test_img_levels(void);
 void test_img_color_matrix(void);
 void test_img_saturate(void);
 void test_img_box_blur(void);
+void test_img_grayscale(void);
+void test_img_gray_gaussian_blur5(void);
 void test_img_crop(void);
 void test_img_scale(void);
+
+/* --- workload #12: horizon detection ---------------------------------------------------------*/
+void test_hd_photos_deterministic(void);
+void test_hd_input_invariants(void);
+void test_hd_ground_truth(void);
+void test_hd_detect_units(void);
+void test_hd_corpus_golden(void);
+void test_hd_seed_variation(void);
+void test_hd_run_sane(void);
+void test_hd_thread_clamp(void);
+void test_hd_accessors_null_safe(void);
 
 /* --- workload #13: photo filter ------------------------------------------------------------*/
 void test_pf_photos_deterministic(void);

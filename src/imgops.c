@@ -142,6 +142,65 @@ void img_box_blur(uint8_t *img, size_t w, size_t h, unsigned r,
     }
 }
 
+void img_grayscale(const uint8_t *rgb, size_t w, size_t h, uint8_t *gray)
+{
+    /* Rec.601 luma, same weights as img_saturate: R 77, G 150, B 29
+     * (8.8 fixed point, sum = 256), half-up rounding. 255 * 256 + 128
+     * fits int32, so plain arithmetic is exact and machine-independent. */
+    size_t n = w * h;
+
+    for (size_t p = 0; p < n; p++) {
+        int32_t v = (int32_t)rgb[p * 3 + 0] * 77 +
+                    (int32_t)rgb[p * 3 + 1] * 150 +
+                    (int32_t)rgb[p * 3 + 2] * 29 + 128;
+
+        gray[p] = (uint8_t)(v >> 8);
+    }
+}
+
+void img_gray_gaussian_blur5(uint8_t *img, size_t w, size_t h,
+                             uint8_t *scratch)
+{
+    /* Separable [1 4 6 4 1]/16 two-pass blur (sigma ~ 1.4 px), the
+     * smoothing stage of a Canny pipeline. Edge-clamped windows (the
+     * image may be smaller than the window), half-up rounding at 4
+     * fractional bits ((sum + 8) >> 4); the window sum is <= 255 * 16,
+     * so uint32 arithmetic is exact. Horizontal pass img -> scratch,
+     * vertical pass scratch -> img. */
+    for (size_t y = 0; y < h; y++) {
+        const uint8_t *row = img + y * w;
+        uint8_t *out = scratch + y * w;
+
+        for (size_t x = 0; x < w; x++) {
+            size_t xm2 = x >= 2 ? x - 2 : 0;
+            size_t xm1 = x >= 1 ? x - 1 : 0;
+            size_t xp1 = x + 1 < w ? x + 1 : w - 1;
+            size_t xp2 = x + 2 < w ? x + 2 : w - 1;
+            uint32_t sum = row[xm2] + 4u * row[xm1] + 6u * row[x] +
+                           4u * row[xp1] + row[xp2];
+
+            out[x] = (uint8_t)((sum + 8u) >> 4);
+        }
+    }
+    for (size_t y = 0; y < h; y++) {
+        uint8_t *out = img + y * w;
+
+        for (size_t x = 0; x < w; x++) {
+            size_t ym2 = y >= 2 ? y - 2 : 0;
+            size_t ym1 = y >= 1 ? y - 1 : 0;
+            size_t yp1 = y + 1 < h ? y + 1 : h - 1;
+            size_t yp2 = y + 2 < h ? y + 2 : h - 1;
+            uint32_t sum = scratch[ym2 * w + x] +
+                           4u * scratch[ym1 * w + x] +
+                           6u * scratch[y * w + x] +
+                           4u * scratch[yp1 * w + x] +
+                           scratch[yp2 * w + x];
+
+            out[x] = (uint8_t)((sum + 8u) >> 4);
+        }
+    }
+}
+
 void img_crop(uint8_t *dst, size_t dw,
               const uint8_t *src, size_t sw, size_t sh,
               size_t x, size_t y, size_t cw, size_t ch)
