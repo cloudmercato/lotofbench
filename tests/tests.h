@@ -245,6 +245,22 @@ void test_bb_run_sane(void);
 void test_bb_thread_clamp(void);
 void test_bb_accessors_null_safe(void);
 
+/* --- workload #11: object remover ------------------------------------------------*/
+void test_or_photos_deterministic(void);
+void test_or_input_invariants(void);
+void test_or_push_units(void);
+void test_or_coarse_fill_units(void);
+void test_or_pull_units(void);
+void test_or_sweep_units(void);
+void test_or_flat_fill_exact(void);
+void test_or_differential_naive(void);
+void test_or_process_reproducible(void);
+void test_or_corpus_golden(void);
+void test_or_seed_variation(void);
+void test_or_run_sane(void);
+void test_or_thread_clamp(void);
+void test_or_accessors_null_safe(void);
+
 /* --- workload 14: hdr -------------------------------------------------------*/
 void test_hdr_scenes_deterministic(void);
 void test_hdr_input_invariants(void);

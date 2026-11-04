@@ -29,6 +29,7 @@
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
 #include "workload_objectdetection.h"
+#include "workload_objectremover.h"
 #include "workload_photofilter.h"
 #include "workload_photolibrary.h"
 #include "workload_raytracer.h"
@@ -483,6 +484,50 @@ int main(void)
             printf("\nHDR_SEED1_TASK_PIXELS_MULTI %llu",
                    (unsigned long long)hdr_task_pixels(1));
             hdr_free(hdr);
+        }
+    }
+    /* object remover: seed-1 photo 0..3 mask shapes, exact mask pixel
+     * counts, mask + filled digests, the exact counters and the task
+     * pixel counts */
+    {
+        or_ctx *orr = or_prepare(1);
+
+        if (orr) {
+            for (unsigned s = 0; s < OR_PHOTOS; s++) {
+                const or_result *r = or_reference(orr, s);
+                or_disc d;
+                or_rect rc;
+                or_box bx;
+
+                if (!r)
+                    continue;
+                d = or_mask_disc(orr, s);
+                rc = or_mask_rect(orr, s);
+                bx = or_mask_box(orr, s);
+                printf("\nOR_SEED1_S%u_ARCH %u", s, or_archetype(orr, s));
+                printf("\nOR_SEED1_S%u_DISC %d %d %d", s, d.cx, d.cy, d.r);
+                printf("\nOR_SEED1_S%u_RECT %d %d %d %d", s, rc.x0, rc.y0,
+                       rc.x1, rc.y1);
+                printf("\nOR_SEED1_S%u_BOX %d %d %d %d", s, bx.x0, bx.y0,
+                       bx.x1, bx.y1);
+                printf("\nOR_SEED1_S%u_MASK_PX %u", s,
+                       or_mask_pixels(orr, s));
+                sha1_hex(or_photo(orr, s), or_photo_len(orr, s), hex);
+                printf("\nOR_SEED1_S%u_PHOTO %s", s, hex);
+                printf("\nOR_SEED1_S%u_MASK", s);
+                for (int i = 0; i < 20; i++)
+                    printf(" %02x", r->mask_digest[i]);
+                printf("\nOR_SEED1_S%u_FILLED", s);
+                for (int i = 0; i < 20; i++)
+                    printf(" %02x", r->filled_digest[i]);
+                printf("\nOR_SEED1_S%u_COUNTERS %u %u %u", s, r->unknown,
+                       r->coarse_fill, r->iters);
+            }
+            printf("\nOR_SEED1_TASK_PIXELS %llu",
+                   (unsigned long long)or_task_pixels(0));
+            printf("\nOR_SEED1_TASK_PIXELS_MULTI %llu",
+                   (unsigned long long)or_task_pixels(1));
+            or_free(orr);
         }
     }
     return 0;

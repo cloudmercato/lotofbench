@@ -194,6 +194,23 @@ static const test_entry TESTS[] = {
     { "backgroundblur/thread-clamp", test_bb_thread_clamp },
     { "backgroundblur/null-accessors", test_bb_accessors_null_safe },
 
+    /* workload #11 — object remover */
+    { "objectremover/photos-deterministic",
+      test_or_photos_deterministic },
+    { "objectremover/input-invariants", test_or_input_invariants },
+    { "objectremover/push-units", test_or_push_units },
+    { "objectremover/coarse-fill-units", test_or_coarse_fill_units },
+    { "objectremover/pull-units", test_or_pull_units },
+    { "objectremover/sweep-units", test_or_sweep_units },
+    { "objectremover/flat-fill-exact", test_or_flat_fill_exact },
+    { "objectremover/differential-naive", test_or_differential_naive },
+    { "objectremover/process-reproducible", test_or_process_reproducible },
+    { "objectremover/corpus-golden", test_or_corpus_golden },
+    { "objectremover/seed-variation", test_or_seed_variation },
+    { "objectremover/run-sane", test_or_run_sane },
+    { "objectremover/thread-clamp", test_or_thread_clamp },
+    { "objectremover/null-accessors", test_or_accessors_null_safe },
+
     { "hdr/scenes-deterministic", test_hdr_scenes_deterministic },
     { "hdr/input-invariants", test_hdr_input_invariants },
     { "hdr/weight-units", test_hdr_weight_units },

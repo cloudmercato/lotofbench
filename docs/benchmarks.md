@@ -25,7 +25,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 8 | Asset Compression             | ASTC/BC7/DXT5 texture codecs, Draco mesh | **implemented v0.11** |
 | 9 | Object Detection              | MobileNet v1 SSD over photos       | **implemented v0.13** |
 | 10| Background Blur               | DeepLabV3+ segmentation on video frames | **implemented v0.14** |
-| 11| Object Remover                | Inpainting (content-aware fill)    | planned |
+| 11| Object Remover                | Inpainting (content-aware fill)    | **implemented v0.16** |
 | 12| Horizon Detection             | Canny edges + Hough transform      | **implemented v0.8** |
 | 13| Photo Filter                  | Color/blur filters, crop, scale    | **implemented v0.7** |
 | 14| HDR                           | Blending six 16 MP SDR photos      | **implemented v0.15** |
@@ -543,6 +543,69 @@ run), a single-frame pipeline instead of temporal mask smoothing,
 synthetic seeded frames instead of a real video clip, and the
 radius-9 box blur (the shared imgops kernel) standing in for GB6's
 tiled Gaussian stack. The throughput metric (frames per second) is
+unaffected because the pipeline is 100% integer, bit-exact and
+machine-independent.
+
+## Workload 11 — Object Remover (implemented)
+
+Geekbench 6's Object Remover workload erases a masked object from a
+photo with content-aware fill (inpainting). LotofBench v0.16
+reproduces the shape dependency-free, 100% integer, with a seeded
+synthetic photo and a planted lasso standing in for the real capture:
+
+- **Corpus**: four seeded 1600x1200 photos in four archetype families
+  (beach, forest, city, studio), each an analytic integer scene —
+  color-band gradients, a sun disc with a quadratic falloff, canopy
+  discs, lit-window buildings, a vignette — plus ±6 per-pixel noise
+  (one draw shared by the three channels, the correlated sensor-noise
+  stand-in). Every photo plants the mask to fill: the union of one
+  disc (radius 64..96) and one overlapping rectangle (160-256 x
+  64-112), both at least 48 px inside the frame, the rectangle always
+  containing the disc's centre row and column. The bytes under the
+  mask stand in for the object being removed (a seeded flat 16 px
+  checker); they are never read by the fill — masked pixels are
+  excluded at every level. Fixed `--seed` means byte-identical photos
+  on every machine; generation is off the clock.
+- **Ground truth**: the mask is exactly the exposed disc ∪ rectangle
+  (shapes and exact pixel counts through accessors); every disc is big
+  enough to leave fully-masked 64x64 blocks at the coarsest pyramid
+  level, so the coarsest-level fallback always fires (coarse_fill >= 1
+  on the whole corpus — a degeneracy guard).
+- **The pipeline** (per photo, inside the timed section): a 6-level
+  push-pull pyramid — push: every coarse cell is the half-up mean of
+  its DISTINCT known children (mask byte == 0, the clamped corner taps
+  deduplicated; a fully masked cell is marked in the coarse mask and
+  carries 0); the coarsest plane's unknown cells take the per-channel
+  half-up mean of its known cells (counted in coarse_fill; an
+  all-unknown plane is a contract failure); pull and solve, coarse to
+  fine: every level's unknown cells are initialized with the shared
+  img_scale_bilinear of the level below's filled plane, then refined
+  by 24 in-place Gauss-Seidel sweeps of the discrete 4-neighbour
+  Laplace equation (raster order, edge-clamped neighbours, half-up
+  (l + r + u + d + 2) >> 2) over the unknown cells only — known cells
+  stay fixed (Dirichlet boundary). The coarse levels carry the
+  low-frequency fill, the per-level sweeps blend in the local boundary
+  detail.
+- **Verification**: every timed cycle re-runs the full pipeline per
+  photo and checks the SHA-1 of the mask and of the filled frame
+  against prepare-time references, plus three exact counters (masked
+  pixels, coarsest-level filled cells, Gauss-Seidel sweeps — 24 x 6
+  levels = 144 per photo), with the degeneracy guards unknown >= 1 and
+  coarse_fill >= 1. Any drift aborts the run instead of scoring.
+- **Cycle**: one run = the four photos through the full fill, timed as
+  a whole with `CLOCK_MONOTONIC`, reported as millions of filled
+  output pixels per second (baseline 30.0 Mpixel/s = 1000 points).
+  The multi-core pass fills 16 photo instances (4x the set) split
+  across threads.
+
+Known v0.16 divergences from Geekbench 6, all deliberate: four
+1600x1200 synthetic photos instead of real captures (the pipeline
+shape and the Mpixels/s metric are the workload's), one fixed
+two-shape lasso mask per photo instead of interactive user strokes, a
+documented push-pull pyramid with mean-fill coarsest level and
+Gauss-Seidel Laplace sweeps instead of an unspecified production fill
+stack, and synthetic seeded scenes instead of real photos. The
+throughput metric (millions of filled output pixels per second) is
 unaffected because the pipeline is 100% integer, bit-exact and
 machine-independent.
 

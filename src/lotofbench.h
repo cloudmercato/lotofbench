@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.15.0"
+#define LOTOFBENCH_VERSION   "0.16.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -19,6 +19,8 @@
 #define OD_WORKLOAD_SLUG     "object-detection"
 #define BB_WORKLOAD_NAME     "Background Blur"
 #define BB_WORKLOAD_SLUG     "background-blur"
+#define OR_WORKLOAD_NAME     "Object Remover"
+#define OR_WORKLOAD_SLUG     "object-remover"
 #define HTML5_WORKLOAD_NAME  "HTML5 Browser"
 #define HTML5_WORKLOAD_SLUG  "html5-browser"
 #define PDF_WORKLOAD_NAME    "PDF Render"
@@ -78,6 +80,16 @@
  * frames per second (a full 1920x1080 frame through the pipeline in
  * about 20 ms, scalar plain-C speed) — a round and honest yardstick. */
 #define BASELINE_BACKGROUNDBLUR_FPS   50.0
+
+/* Workload #11 — Object Remover: millions of inpainted output pixels
+ * per second (each photo through the push-pull pyramid fill,
+ * contributing its one filled 1600x1200 frame). The 1000-point
+ * reference machine fills 30.0 million pixels per second — the full
+ * 4-photo set (7.68 Mpx) in ~256 ms single-core, scalar plain-C speed.
+ * Chosen as a round yardstick next to the probe measurement: 33.9
+ * Mpx/s on the development box under load ~2, so the true idle rate
+ * sits just above the constant (the HDR discipline). */
+#define BASELINE_OBJECTREMOVER_MPIXELS 30.0
 
 /* Workload #3 — HTML5 Browser: pages rendered per second (parse +
  * layout + raster of one 800x600 page). The 1000-point reference
