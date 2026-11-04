@@ -21,6 +21,7 @@
 #include "rng.h"
 #include "sha1.h"
 #include "workload_assetcompression.h"
+#include "workload_backgroundblur.h"
 #include "workload_clang.h"
 #include "workload_compression.h"
 #include "workload_horizon.h"
@@ -406,6 +407,43 @@ int main(void)
         printf("\nOD_SEED1_TASK_IMAGES_MULTI %llu",
                (unsigned long long)od_task_images(1));
         od_free(od);
+    }
+
+    /* background blur: the model table's digest, seed-1 frame 0 source
+     * digest, its mask/output digests and counters, the task frame
+     * counts */
+    {
+        bb_ctx *bb = bb_prepare(1);
+
+        if (!bb)
+            return 1;
+        {
+            uint8_t md[20];
+
+            memcpy(md, bb_model_digest(bb), 20);
+            sha1_hex(md, 20, hex);
+            printf("\nBB_SEED1_MODELS_SHA1 %s", hex);
+        }
+        sha1_hex(bb_frame(bb, 0), bb_frame_len(bb, 0), hex);
+        printf("\nBB_SEED1_FRAME0_SHA1 %s len=%zu", hex,
+               bb_frame_len(bb, 0));
+        {
+            const bb_result *r = bb_reference(bb, 0);
+
+            printf("\nBB_SEED1_FRAME0_MASK");
+            for (int i = 0; i < 20; i++)
+                printf(" %02x", r->mask_digest[i]);
+            printf("\nBB_SEED1_FRAME0_OUT");
+            for (int i = 0; i < 20; i++)
+                printf(" %02x", r->out_digest[i]);
+            printf("\nBB_SEED1_FRAME0_MASK_ONES %u", r->mask_ones);
+            printf("\nBB_SEED1_FRAME0_CHANGED %u", r->changed);
+        }
+        printf("\nBB_SEED1_TASK_FRAMES %llu",
+               (unsigned long long)bb_task_frames(0));
+        printf("\nBB_SEED1_TASK_FRAMES_MULTI %llu",
+               (unsigned long long)bb_task_frames(1));
+        bb_free(bb);
     }
     return 0;
 }

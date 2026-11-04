@@ -94,12 +94,24 @@ list and implementation status live in
   img/s metric) + 13 tests including a full differential of the NHWC
   pipeline against an independent CHW reference and a degeneracy
   guard on the activation statistics.
+- **v0.14** — Workload #10 Background Blur (twelve seeded 1920x1080
+  RGB frames in four static-camera archetype families — one planted
+  subject per frame, its box and tone exposed as ground truth —
+  through a 100%-integer portrait-blur pipeline: 1/4 box downscale,
+  per-cell max-channel background subtraction against an exact
+  prepare-time model per archetype (threshold 24), 3x3 majority
+  filter, bilinear x4 mask upsample, radius-9 separable box blur and
+  the per-pixel mask-modulated composite; every timed cycle verifies
+  the SHA-1 of the mask and of the composited output against
+  prepare-time references, fps metric) + 13 tests including a
+  differential of the whole pipeline against an independently written
+  naive reference and ground-truth checks that the subject stays
+  sharp while the far background is exactly the blurred frame.
 
 ## Suggested landing order
 
-1. ~~#9 Object Detection~~ — **landed in v0.13**; next in line:
-2. **#10 Background Blur** — simplified segmentation mask + per-pixel
-   blur strength over synthetic frames.
+1. ~~#9 Object Detection~~ — **landed in v0.13**.
+2. ~~#10 Background Blur~~ — **landed in v0.14**; next in line:
 3. **#11 Object Remover** — iterative Laplacian/pyramid inpainting.
 4. **#14 HDR** — exposure-fusion pyramid blend over six synthetic
    exposures.
@@ -126,7 +138,7 @@ the same grouping once it aggregates (see Composite scoring).
 | # | Workload | Geekbench 6 does | LotofBench approach |
 |---|----------|------------------|---------------------|
 | 9 | Object Detection | MobileNet v1 SSD over photos | Fixed deterministic quantized (int8) conv net over synthetic images; metric images/s; verify output tensor hash — **implemented v0.13** |
-| 10 | Background Blur | DeepLabV3+ segmentation on video | Simplified segmentation mask + per-pixel blur strength over synthetic frames; metric fps |
+| 10 | Background Blur | DeepLabV3+ segmentation on video | Simplified segmentation mask + per-pixel blur strength over synthetic frames; metric fps — **implemented v0.14** |
 | 11 | Object Remover | Inpainting (content-aware fill) | Iterative Laplacian/pyramid fill over synthetic masks; metric Mpixels/s |
 | 12 | Horizon Detection | Canny edges + Hough transform | From-scratch Canny + Hough over synthetic images with known horizons; metric Mpixels/s; verify detected line parameters against ground truth — **implemented v0.8** |
 | 13 | Photo Filter | Color/blur filters, crop, scale | Gaussian/box blur, saturation, crop+scale pipelines over synthetic images; metric Mpixels/s — **implemented v0.7** |

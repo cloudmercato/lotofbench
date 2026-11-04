@@ -8,12 +8,13 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 12 of 16
+## Status — workload 14 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
 **Photo Library**, **Clang**, **Text Processing**, **Asset
-Compression**, **Horizon Detection**, **Photo Filter**, **Ray Tracer**
-and **Structure from Motion** are implemented (twelve of the Geekbench
+Compression**, **Object Detection**, **Background Blur**, **Horizon
+Detection**, **Photo Filter**, **Ray Tracer** and **Structure from
+Motion** are implemented (fourteen of the Geekbench
 6 CPU workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
@@ -58,6 +59,19 @@ workload list, the roadmap and the suggested landing order live in
   parallelogram + zigzag + varint geometry codec, verify every
   encoded-stream digest, every decoded artifact and the exact encode
   error, score the asset-bytes rate.
+- **Object Detection** — run eight seeded synthetic photos (six
+  archetype families, 300×300 px, 1-4 planted ground-truth objects)
+  through a fixed deterministic int8 MobileNetV1-shaped net with an
+  SSD-lite decode head — 12 convolutions, 316,225,344 exact int8 MACs
+  per photo — verify the feature-map, head-tensor and detection
+  digests, score the photos-per-second rate.
+- **Background Blur** — blur the background behind the subject of
+  twelve seeded synthetic 1920×1080 frames (four static-camera
+  archetype families, one planted subject per frame) through a
+  100%-integer pipeline — 1/4 box downscale, exact
+  background-subtraction segmentation, 3x3 majority filter, bilinear
+  mask upsample, radius-9 box blur, mask-modulated composite — verify
+  every mask and output digest, score the frames-per-second rate.
 - **Horizon Detection** — detect the horizon in eight seeded synthetic
   photos (six archetype families, 1600×1200 px, planted ground-truth
   boundary) through the full Canny chain — grayscale, separable
@@ -401,6 +415,12 @@ src/workload_textprocessing.[ch] workload #7 — corpus, regex, Markdown→HTML
 src/workload_assetcompression.[ch]
                               workload #8 — asset corpus, BC1/BC3 codecs,
                               geometry codec, verification
+src/workload_objectdetection.[ch]
+                              workload #9 — photo corpus, int8 conv net,
+                              SSD-lite decode head
+src/workload_backgroundblur.[ch]
+                              workload #10 — frame corpus, background
+                              models, segmentation + blur pipeline
 src/workload_horizon.[ch]    workload #12 — photo corpus, Canny + Hough
 src/workload_raytracer.[ch]  workload #15 — showroom, BVH, Whitted tracer
 src/itrig.[ch]               shared integer trig table (0.25-degree bins)
