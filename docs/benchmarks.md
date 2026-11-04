@@ -30,7 +30,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 13| Photo Filter                  | Color/blur filters, crop, scale    | **implemented v0.7** |
 | 14| HDR                           | Blending six 16 MP SDR photos      | planned |
 | 15| Ray Tracer                    | Blender BMW scene, Embree-style    | **implemented v0.9** |
-| 16| Structure from Motion         | 3D geometry from 2D image pairs    | planned |
+| 16| Structure from Motion         | 3D geometry from 2D image pairs    | **implemented v0.12** |
 
 Geekbench also runs GPU compute workloads; they are out of scope for now.
 
@@ -549,6 +549,53 @@ primary ray with no jitter or anti-aliasing — the throughput metric
 (rays per second) is unaffected because the ray count is exact and
 machine-independent.
 
+## Workload 16 — Structure from Motion (implemented)
+
+Geekbench 6's Structure from Motion workload reconstructs 3D camera and
+point geometry from image pairs with a full SfM pipeline. LotofBench
+v0.11 reproduces the shape dependency-free, bit-identically:
+
+- **Scene**: a seeded synthetic room — 544 3D points spread over a
+  ground plane, two facades, a back wall and a ceiling, each point
+  perturbed by a ±0.25 m seeded jitter so no surface stays exactly
+  planar (the classic degeneracy of the 8-point estimator). Fixed
+  `--seed` means bit-identical geometry on every machine; generation is
+  off the clock.
+- **Views**: twelve seeded convergent stereo pairs (48 in the
+  multi-core pass). Both 640×480 grayscale views of a pair see the same
+  scene points as bright disks (radius 4 px, seeded intensity) with a
+  dark centre pixel; visibility requires both projections inside an
+  8-px border at depth ≥ 1 m, and patches keep a 9-px clearance in both
+  views. About 1/7 of the correspondences are planted mismatches, each
+  at least 20 px off its epipolar line.
+- **Pipeline**: FAST-9 corner detection (16-pixel Bresenham ring,
+  ring-SAD score, deterministic non-max suppression) on both views →
+  nearest-corner matching (each patch centre must be recovered exactly)
+  → RANSAC essential-matrix estimation (96 iterations, Hartley-
+  normalized 8-point least squares refined over the best sample's
+  inliers, cyclic Jacobi eigensolvers — no libm) → pose selection by
+  cheirality over the four (R, ±t) candidates → midpoint triangulation
+  of every inlier. The timed path is float arithmetic restricted to
+  IEEE-exact operations (`+ - * / sqrtf`) under `-ffp-contract=off`.
+- **Verification**: a pair's reconstruction must reproduce its
+  prepare-time SHA-1 digest, the exact planted inlier/outlier split,
+  the planted relative pose (0.02 rad, 2° translation direction), a
+  sub-pixel reprojection bound and a cloud-shape bound — any drift
+  aborts the run instead of scoring. A pair whose geometry resists
+  verification is deterministically re-rolled (camera pose, mismatch
+  placement and RANSAC salt) until it verifies; attempt 0 is the plain
+  seeded pair.
+- **Cycle**: one run = the whole pair set (all twelve reconstructions),
+  timed as a whole with `CLOCK_MONOTONIC`. The multi-core pass
+  reconstructs 48 pairs (4x the set) split across threads.
+
+Known v0.12 divergences from Geekbench 6, all deliberate: a synthetic
+point-room instead of real photo sequences, one fixed pipeline (FAST-9
++ 8-point RANSAC + midpoint triangulation) instead of a production
+bundle-adjustment stack, and integer-trig camera geometry — the
+throughput metric (pairs per second) is unaffected because the
+verification is exact and machine-independent.
+
 ## Metric
 
 Each run reports a **throughput**, and the workload result is the
@@ -612,6 +659,12 @@ Each run reports a **throughput**, and the workload result is the
   deterministic (same seed, same count), so it is the ray tracer's
   analogue of the corpus size. On the default seed the suite traces
   5,690,792 rays per pass.
+- **Structure from Motion** — image pairs reconstructed divided by the
+  wall-clock seconds of the full pair set, in pairs per second. A pair
+  "reconstruction" is the whole pipeline (detect + match + RANSAC +
+  pose + triangulate + verify), so the unit is honest at the workload
+  level. The pair count is exact and deterministic (12 single-core /
+  48 multi-core), like the corpus size for File Compression.
 
 ## Scoring
 
@@ -662,6 +715,9 @@ publishes its own score.
 - `BASELINE_RAYTRACER_MRAYS` = **5.0 Mray/s** = 1000 (workload #15) —
   the reference machine traces about 5 million rays per second through
   the BVH (the 8-view pass in about 1.1 s single-core).
+- `BASELINE_SFM_PAIRS` = **100.0 pairs/s** = 1000 (workload #16) — the
+  reference machine reconstructs 100 image pairs per second (the
+  12-pair set in about 120 ms single-core).
 
 ## Multi-core model
 
@@ -705,6 +761,12 @@ LotofBench does the same for every workload:
   single-core set) split into equal contiguous slices, one per thread;
   each thread runs all five stages on its photos and verifies every
   output against the reference digests.
+- **Structure from Motion** — the multi-core pass reconstructs 48
+  pairs (4x the single-core set) split into equal contiguous slices,
+  one per thread; each thread runs the full detection → matching →
+  RANSAC → pose → triangulation pipeline on its pairs and verifies
+  every reconstruction against the prepare-time reference and the
+  planted truth.
 
 Runs are synchronised through a start gate (every thread must be ready
 before the clock starts, and the clock stops when the last thread

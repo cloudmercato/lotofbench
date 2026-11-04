@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.11.0"
+#define LOTOFBENCH_VERSION   "0.12.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -31,6 +31,8 @@
 #define HD_WORKLOAD_SLUG     "horizon-detection"
 #define RT_WORKLOAD_NAME     "Ray Tracer"
 #define RT_WORKLOAD_SLUG     "ray-tracer"
+#define SFM_WORKLOAD_NAME    "Structure from Motion"
+#define SFM_WORKLOAD_SLUG    "structure-from-motion"
 #define AC_WORKLOAD_NAME     "Asset Compression"
 #define AC_WORKLOAD_SLUG     "asset-compression"
 
@@ -108,6 +110,14 @@
  * about 5.0 million rays per second through the BVH (the 8-view pass in
  * ~1.1 s single-core). */
 #define BASELINE_RAYTRACER_MRAYS      5.0
+
+/* Workload #16 — Structure from Motion: image pairs reconstructed per
+ * second (each pair runs FAST-9 detection on both views, correspondence
+ * pairing, RANSAC essential estimation, pose selection and
+ * triangulation of every inlier). The 1000-point reference machine
+ * reconstructs 100.0 pairs per second (a 12-pair set in ~120 ms
+ * single-core). */
+#define BASELINE_SFM_PAIRS            100.0
 
 /* One published workload result (single- or multi-core). */
 typedef struct {

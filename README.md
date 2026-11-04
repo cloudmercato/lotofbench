@@ -8,13 +8,13 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 11 of 16
+## Status — workload 12 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
 **Photo Library**, **Clang**, **Text Processing**, **Asset
-Compression**, **Horizon Detection**, **Photo Filter** and **Ray
-Tracer** are implemented (eleven of the
-Geekbench 6 CPU workloads). The full
+Compression**, **Horizon Detection**, **Photo Filter**, **Ray Tracer**
+and **Structure from Motion** are implemented (twelve of the Geekbench
+6 CPU workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
@@ -75,6 +75,13 @@ workload list, the roadmap and the suggested landing order live in
   over a BVH — ambient + Lambert + Phong shading, shadow rays, mirror
   reflections — verify every frame digest and the exact ray count,
   score the rays-per-second rate.
+- **Structure from Motion** — reconstruct twelve seeded stereo pairs of
+  a synthetic point room (640×480 px views, ~250 visible points per
+  pair, 1/7 planted mismatches) with FAST-9 corners, nearest-corner
+  matching, a Hartley-normalized 8-point RANSAC essential estimator,
+  cheirality pose selection and midpoint triangulation — verify the
+  digest, the exact inlier split, the planted pose and sub-pixel
+  reprojection, score the pairs-per-second rate.
 
 ## Build (one command)
 
@@ -200,6 +207,15 @@ Single-Core
 Multi-Core (12 threads, shared task)
   throughput       26.9 Mray/s
   score            5385
+
+Structure from Motion (12 pairs, 640x480 px, 544 scene points, FAST+RANSAC)
+Single-Core
+  throughput       36.9 pairs/s
+  score             369   (baseline 100.0 pairs/s = 1000)
+
+Multi-Core (4 threads, shared task)
+  throughput      133.9 pairs/s
+  score            1339
 ```
 
 ## What it measures
