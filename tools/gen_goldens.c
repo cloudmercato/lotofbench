@@ -26,6 +26,7 @@
 #include "workload_horizon.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
+#include "workload_objectdetection.h"
 #include "workload_photofilter.h"
 #include "workload_photolibrary.h"
 #include "workload_raytracer.h"
@@ -362,6 +363,49 @@ int main(void)
         printf("\nSFM_SEED1_TASK_PAIRS_MULTI %llu",
                (unsigned long long)sfm_task_pairs(1));
         sfm_free(sfm);
+    }
+
+    /* object detection: the fixed net's digest, seed-1 photo 0 source
+     * digest, its three reference digests, its per-class counts and
+     * the task MAC/image counts */
+    {
+        od_ctx *od = od_prepare(1);
+
+        if (!od)
+            return 1;
+        {
+            uint8_t nd[20];
+
+            memcpy(nd, od_net_digest(od), 20);
+            sha1_hex(nd, 20, hex);
+            printf("\nOD_SEED1_NET_SHA1 %s", hex);
+        }
+        sha1_hex(od_photo(od, 0), od_photo_len(od, 0), hex);
+        printf("\nOD_SEED1_PHOTO0_SHA1 %s len=%zu", hex,
+               od_photo_len(od, 0));
+        {
+            const od_result *r = od_reference(od, 0);
+
+            printf("\nOD_SEED1_PHOTO0_FEAT");
+            for (int i = 0; i < 20; i++)
+                printf(" %02x", r->feature_digest[i]);
+            printf("\nOD_SEED1_PHOTO0_TENS");
+            for (int i = 0; i < 20; i++)
+                printf(" %02x", r->tensor_digest[i]);
+            printf("\nOD_SEED1_PHOTO0_DET");
+            for (int i = 0; i < 20; i++)
+                printf(" %02x", r->det_digest[i]);
+            printf("\nOD_SEED1_PHOTO0_CLASSES");
+            for (unsigned c = 0; c < OD_CLASSES; c++)
+                printf(" %u", r->classes[c]);
+        }
+        printf("\nOD_SEED1_TASK_MACS %llu",
+               (unsigned long long)od_task_macs());
+        printf("\nOD_SEED1_TASK_IMAGES %llu",
+               (unsigned long long)od_task_images(0));
+        printf("\nOD_SEED1_TASK_IMAGES_MULTI %llu",
+               (unsigned long long)od_task_images(1));
+        od_free(od);
     }
     return 0;
 }

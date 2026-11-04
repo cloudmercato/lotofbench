@@ -23,7 +23,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 6 | Clang                         | Compiling the Lua interpreter      | **implemented v0.4** |
 | 7 | Text Processing               | Regex parsing, Markdown→HTML (Python) | **implemented v0.5** |
 | 8 | Asset Compression             | ASTC/BC7/DXT5 texture codecs, Draco mesh | **implemented v0.11** |
-| 9 | Object Detection              | MobileNet v1 SSD over photos       | planned |
+| 9 | Object Detection              | MobileNet v1 SSD over photos       | **implemented v0.13** |
 | 10| Background Blur               | DeepLabV3+ segmentation on video frames | planned |
 | 11| Object Remover                | Inpainting (content-aware fill)    | planned |
 | 12| Horizon Detection             | Canny edges + Hough transform      | **implemented v0.8** |
@@ -416,6 +416,75 @@ Draco's full mesh-processing pipeline, 256x256 textures instead of
 GB6's assorted sizes, and synthetic seeded assets instead of real
 texture/mesh files — the throughput metric (asset bytes per second) is
 unaffected because the byte count is exact and machine-independent.
+
+## Workload 9 — Object Detection (implemented)
+
+Geekbench 6's Object Detection workload runs a quantized MobileNet V1
+with an SSD-lite detection head over a set of photos — the first of
+Geekbench's Floating-Point workloads. LotofBench v0.13 reproduces the
+shape dependency-free with a fixed, deterministic int8 conv net over
+synthetic photos:
+
+- **Photos**: 8 seeded 300x300 RGB photos (the SSD300 input size, the
+  stand-in for GB6's resize step) in six archetype families cycling
+  the way a real capture session does — city street, living room,
+  park, kitchen counter, desk, highway. Each photo is a two-stop
+  vertical background gradient plus per-pixel noise and 1-4 planted
+  objects: 30-60 px rectangles darkened by 50-90 per channel, placed
+  by rejection sampling so they never overlap (the darkest background
+  still leaves the darkening above the noise floor). The planted
+  boxes, classes and tones are the ground truth, exposed through
+  accessors and verified at prepare time. Fixed `--seed` means
+  byte-identical photos on every machine; generation is off the
+  clock.
+- **The net**: a MobileNetV1-shaped stack of 12 convolutions — 3x3
+  stem (stride 2), then five depthwise-separable blocks (strides
+  1, 2, 2, 2, 1; channels 32-64-128-256-512-512; sides
+  150-75-38-19-19) — followed by an SSD-lite-style 1x1 head mapping
+  the 19x19 grid to 8 planes: 4 class logits and 4 box deltas per
+  cell. Deltas 0 decode to the anchor box (a centered square whose
+  side grows with the row, 8 px at the top), the regression offsets
+  are in 1/8-pixel fixed point, and every cell decodes to exactly one
+  detection; the workload counts detections per class. Exactly
+  316,225,344 int8 multiply-accumulates run per photo — the count is
+  pinned by a unit test and every layer's geometry is documented in
+  `src/workload_objectdetection.c`.
+- **Quantization**: weights come from a dedicated PRNG stream with a
+  hard-coded seed (`0x0D9`), independent of `--seed` — the net is
+  part of the workload's identity, like the File Compression corpus,
+  and its SHA-1 is pinned. Inputs are quantized to symmetric int8
+  (`q = p * 254 / 255 - 127`, round half up); after every convolution
+  the int32 accumulator is requantized with a per-layer shift, round
+  half up away from zero, ReLU on the 11 hidden layers, saturation to
+  [-127, 127]. The shifts were fixed at design time from the
+  weight distribution and the corpus statistics so every layer's
+  output RMS stays in a healthy int8 range (measured 12-31, seed-1
+  corpus): a shift schedule
+  picked on max-magnitude grounds decays the activations by ~2x per
+  layer and silently collapses the stack to zero — the differential
+  test carries a degeneracy guard (> 10% nonzero activations and a
+  firing head) so the collapse can never come back unnoticed.
+- **Verification**: every timed cycle re-runs the full pipeline per
+  photo (quantize, 12 convolutions, SSD-lite decode) and checks the
+  SHA-1 of the final feature map, of the head tensor and of the
+  decoded detections against prepare-time references, plus the
+  per-class detection counts. Any drift aborts the run instead of
+  scoring.
+- **Cycle**: one run = all 8 photos through the pipeline, timed as a
+  whole with `CLOCK_MONOTONIC`. The multi-core pass runs 32 photo
+  instances (4x the set) split across threads.
+
+Known v0.13 divergences from Geekbench 6, all deliberate: an
+untrained net with fixed random int8 weights instead of trained
+MobileNet/SSD parameters (the compute is identical; the head's class
+column sums dominate its argmax, so detections concentrate on a few
+classes — e.g. 2/69/164/126 over the 361 cells for photo 0 — while
+the box geometry stays anchor-driven), a single-scale SSD-lite head on
+the 19x19 grid instead of the full detection-pyramid stack, synthetic
+seeded photos instead of a real capture set, and the input quantize
+standing in for the SSP/resize preprocessing. The throughput metric
+(photos per second) is unaffected because the MAC count is exact,
+fixed and machine-independent.
 
 ## Workload 12 — Horizon Detection (implemented)
 

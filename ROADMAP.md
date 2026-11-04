@@ -84,12 +84,25 @@ list and implementation status live in
   stream until the classifier recovers the planted class, so every
   seed yields a valid corpus (seeds 1-40 verified, seed-1 digests
   unchanged).
+- **v0.13** — Workload #9 Object Detection (eight seeded 300x300
+  synthetic photos with planted ground-truth objects through a fixed
+  deterministic int8 MobileNetV1-shaped net with an SSD-lite decode
+  head — 12 convolutions, 316,225,344 exact MACs per image, round
+  half-up requantization with RMS-calibrated per-layer shifts; every
+  timed cycle verifies the SHA-1 of the final feature map, the head
+  tensor and the decoded detections against prepare-time references,
+  img/s metric) + 13 tests including a full differential of the NHWC
+  pipeline against an independent CHW reference and a degeneracy
+  guard on the activation statistics.
 
 ## Suggested landing order
 
-1. **#9 Object Detection** — a fixed deterministic quantized conv net,
-   the first Floating-Point workload; opens the composite-scoring
-   discussion.
+1. ~~#9 Object Detection~~ — **landed in v0.13**; next in line:
+2. **#10 Background Blur** — simplified segmentation mask + per-pixel
+   blur strength over synthetic frames.
+3. **#11 Object Remover** — iterative Laplacian/pyramid inpainting.
+4. **#14 HDR** — exposure-fusion pyramid blend over six synthetic
+   exposures.
 
 ## The remaining Geekbench 6 CPU workloads
 
@@ -112,7 +125,7 @@ the same grouping once it aggregates (see Composite scoring).
 
 | # | Workload | Geekbench 6 does | LotofBench approach |
 |---|----------|------------------|---------------------|
-| 9 | Object Detection | MobileNet v1 SSD over photos | Fixed deterministic quantized (int8) conv net over synthetic images; metric images/s; verify output tensor hash |
+| 9 | Object Detection | MobileNet v1 SSD over photos | Fixed deterministic quantized (int8) conv net over synthetic images; metric images/s; verify output tensor hash — **implemented v0.13** |
 | 10 | Background Blur | DeepLabV3+ segmentation on video | Simplified segmentation mask + per-pixel blur strength over synthetic frames; metric fps |
 | 11 | Object Remover | Inpainting (content-aware fill) | Iterative Laplacian/pyramid fill over synthetic masks; metric Mpixels/s |
 | 12 | Horizon Detection | Canny edges + Hough transform | From-scratch Canny + Hough over synthetic images with known horizons; metric Mpixels/s; verify detected line parameters against ground truth — **implemented v0.8** |
