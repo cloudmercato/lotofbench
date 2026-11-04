@@ -7,6 +7,12 @@
  * harness.c; this file owns the CLI and the output. */
 
 #define _POSIX_C_SOURCE 200809L
+/* macOS gates _SC_NPROCESSORS_ONLN (and friends) behind the Darwin
+ * extensions: a strict _POSIX_C_SOURCE alone hides it from <unistd.h>.
+ * Re-expose them so the one-command build works on macOS. */
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE 200809L
+#endif
 
 #include "harness.h"
 #include "lotofbench.h"
