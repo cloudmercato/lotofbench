@@ -11,6 +11,7 @@
 
 #include "harness.h"
 
+#include <math.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +43,33 @@ double lb_median(double *values, size_t n)
 long lb_score(double throughput, double baseline)
 {
     return (long)(throughput / baseline * 1000.0 + 0.5);
+}
+
+double lb_geomean(const long *scores, size_t n)
+{
+    double sum_log = 0.0;
+
+    if (n == 0)
+        return 0.0;
+    for (size_t i = 0; i < n; i++) {
+        if (scores[i] <= 0)
+            return 0.0;
+        sum_log += log((double)scores[i]);
+    }
+    return exp(sum_log / (double)n);
+}
+
+long lb_section(const long *scores, size_t n)
+{
+    return (long)(lb_geomean(scores, n) + 0.5);
+}
+
+long lb_composite(long integer_score, long floating_score)
+{
+    double composite = LB_INTEGER_WEIGHT * (double)integer_score +
+                       LB_FLOATING_WEIGHT * (double)floating_score;
+
+    return (long)(composite + 0.5);
 }
 
 typedef struct {

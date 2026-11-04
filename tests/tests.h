@@ -71,6 +71,9 @@ void test_lz4_small_thread_stack(void);
 /* --- harness ---------------------------------------------------------------------*/
 void test_median_odd_even(void);
 void test_score_rounding(void);
+void test_section_geomean(void);
+void test_section_rounding(void);
+void test_composite_weighting(void);
 void test_harness_counts_and_times(void);
 void test_harness_failure_propagates(void);
 void test_harness_single_thread(void);

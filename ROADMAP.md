@@ -146,8 +146,11 @@ list and implementation status live in
 2. ~~#10 Background Blur~~ — **landed in v0.14**.
 3. ~~#14 HDR~~ — **landed in v0.15**.
 4. ~~#11 Object Remover~~ — **landed in v0.16**; all 16 Geekbench 6
-   CPU workloads are now implemented. Next up per Cross-cutting: the
-   composite scoring once its gating conditions are met (they now are).
+   CPU workloads are now implemented.
+5. ~~Composite scoring~~ — **landed in 1.0.0**: the section scores are
+   the geometric means of the Integer / Floating-Point member scores
+   and the composite their 65/35 weighted arithmetic mean, published
+   alongside the per-workload scores.
 
 ## The remaining Geekbench 6 CPU workloads
 
@@ -181,12 +184,12 @@ the same grouping once it aggregates (see Composite scoring).
 
 ## Cross-cutting
 
-- **Composite scoring** — currently each workload publishes its own
-  score. Once the Integer and Floating-Point sections each hold at
-  least two workloads, adopt the Geekbench 6 aggregation: geometric
-  mean per section, then the 65/35 weighted composite; keep publishing
-  per-workload scores alongside. Scores stay non-comparable with
-  Geekbench (own baselines).
+- **Composite scoring** — **landed in 1.0.0**: section scores are the
+  geometric means of the member workloads' scores, the composite the
+  65/35 weighted arithmetic mean of the two sections
+  (docs/benchmarks.md, "The composite score"). Per-workload scores are
+  still published alongside; scores stay non-comparable with Geekbench
+  (own baselines).
 - **Calibration discipline** — one baseline per workload, chosen when
   it lands, pinned in `src/lotofbench.h` and documented in
   `docs/benchmarks.md`. Baselines never move after landing; a move is a
@@ -196,12 +199,15 @@ the same grouping once it aggregates (see Composite scoring).
   unit tests. After a *deliberate* format change, regenerate the pins
   with `tools/gen_goldens.c` and update the tests in the same commit.
 - **CLI** — add `--workload <slug>` (run a subset) and
-  `--list-workloads`; keep the `--json` output stable and versioned
-  (add a `"schema"` field).
+  `--list-workloads`; the `--json` output is versioned through its
+  top-level `"schema"` field (1 since the composite landed) — keep it
+  backward-compatible when it changes. `--json-out PATH` (landed with
+  the composite) stores the JSON document in a file.
 - **CI** — run `make` and `make test` on every push via Gitea Actions;
   pending the Gitea runner being functional again.
-- **Versioning** — minor bump per workload landing (0.3.0 with the
-  third), 1.0.0 when all 16 exist and the composite is live.
+- **Versioning** — 1.0.0 shipped all 16 workloads and the live
+  composite; from there, minor bumps for feature changes, major bumps
+  when a baseline moves (a move rescales every published score).
 
 ## Testing conventions (every new workload lands with)
 

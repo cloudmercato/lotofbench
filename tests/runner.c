@@ -27,6 +27,9 @@ static const test_entry TESTS[] = {
     /* harness */
     { "harness/median", test_median_odd_even },
     { "harness/score-rounding", test_score_rounding },
+    { "harness/section-geomean", test_section_geomean },
+    { "harness/section-rounding", test_section_rounding },
+    { "harness/composite-weighting", test_composite_weighting },
     { "harness/counts-and-times", test_harness_counts_and_times },
     { "harness/failure-propagates", test_harness_failure_propagates },
     { "harness/single-thread", test_harness_single_thread },

@@ -35,18 +35,20 @@
 typedef struct {
     unsigned corpus_mb, runs, seed, threads; /* requested thread count */
     int json;
+    const char *json_out; /* also store the JSON document in this file */
 } options;
 
 static void usage(FILE *out)
 {
     fprintf(out,
             "usage: lotofbench [--size-mb N] [--runs N] [--threads N] "
-            "[--seed N] [--json]\n");
+            "[--seed N] [--json] [--json-out PATH]\n");
 }
 
 static options parse_args(int argc, char **argv)
 {
-    options o = { DEFAULT_CORPUS_MB, DEFAULT_RUNS, DEFAULT_SEED, 0, 0 };
+    options o = { DEFAULT_CORPUS_MB, DEFAULT_RUNS, DEFAULT_SEED, 0, 0,
+              NULL };
     long nproc = sysconf(_SC_NPROCESSORS_ONLN);
 
     if (nproc < 1)
@@ -66,6 +68,8 @@ static options parse_args(int argc, char **argv)
             o.seed = (unsigned)strtoul(argv[++i], NULL, 10);
         } else if (!strcmp(argv[i], "--json")) {
             o.json = 1;
+        } else if (!strcmp(argv[i], "--json-out") && i + 1 < argc) {
+            o.json_out = argv[++i];
         } else if (!strcmp(argv[i], "--help")) {
             usage(stdout);
             exit(0);
@@ -297,7 +301,8 @@ static void print_block(const char *unit, double baseline,
     printf("  score       %9ld\n", multi->score);
 }
 
-static void print_json(const options *opt, const lb_result *fc_single,
+static void print_json(FILE *out, const options *opt,
+                       const lb_result *fc_single,
                        const lb_result *fc_multi,
                        const lb_result *nav_single,
                        const lb_result *nav_multi, uint64_t nav_ops,
@@ -330,190 +335,278 @@ static void print_json(const options *opt, const lb_result *fc_single,
                        const lb_result *rt_multi, uint64_t rt_rays,
                        unsigned rt_triangles,
                        const lb_result *sfm_single,
-                       const lb_result *sfm_multi, uint64_t sfm_pairs)
+                       const lb_result *sfm_multi, uint64_t sfm_pairs,
+                       long integer_single, long integer_multi,
+                       long floating_single, long floating_multi,
+                       long composite_single, long composite_multi)
 {
-    printf("{\n");
-    printf("  \"benchmark\": \"lotofbench\",\n");
-    printf("  \"version\": \"%s\",\n", LOTOFBENCH_VERSION);
-    printf("  \"seed\": %u,\n", opt->seed);
-    printf("  \"runs\": %u,\n", opt->runs);
-    printf("  \"workloads\": [\n");
-    printf("    {\"name\": \"%s\", \"corpus_mb\": %u, "
-           "\"baseline_mbps\": %.1f,\n",
-           FC_WORKLOAD_SLUG, opt->corpus_mb, BASELINE_FILECOMPRESSION_MBPS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
-           "\"score\": %ld},\n",
-           fc_single->threads, fc_single->throughput, fc_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
-           "\"score\": %ld}},\n",
-           fc_multi->threads, fc_multi->throughput, fc_multi->score);
-    printf("    {\"name\": \"%s\", \"grid_side\": %u, \"routes\": %u, "
-           "\"edges_relaxed\": %llu, \"baseline_medges\": %.1f,\n",
-           NAV_WORKLOAD_SLUG, NAV_GRID_SIDE, NAV_ROUTES,
-           (unsigned long long)nav_ops, BASELINE_NAVIGATION_MEDGES);
-    printf("     \"single\": {\"threads\": %u, \"throughput_medges\": %.1f, "
-           "\"score\": %ld},\n",
-           nav_single->threads, nav_single->throughput, nav_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_medges\": %.1f, "
-           "\"score\": %ld}},\n",
-           nav_multi->threads, nav_multi->throughput, nav_multi->score);
-    printf("    {\"name\": \"%s\", \"pages\": %u, \"view\": \"%ux%u\", "
-           "\"elements\": %llu, \"pages_rendered\": %llu, "
-           "\"baseline_pps\": %.1f,\n",
-           HTML5_WORKLOAD_SLUG, HTML5_PAGES, HTML5_VIEW_W, HTML5_VIEW_H,
-           (unsigned long long)h5_elements,
-           (unsigned long long)h5_pages, BASELINE_HTML5BROWSER_PPS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_pps\": %.1f, "
-           "\"score\": %ld},\n",
-           h5_single->threads, h5_single->throughput, h5_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_pps\": %.1f, "
-           "\"score\": %ld}},\n",
-           h5_multi->threads, h5_multi->throughput, h5_multi->score);
-    printf("    {\"name\": \"%s\", \"docs\": %u, \"pages_per_doc\": %u, "
-           "\"pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
-           PDF_WORKLOAD_SLUG, PDF_DOCS, PDF_PAGES_PER_DOC,
-           (unsigned long long)pdf_pixels, BASELINE_PDFRENDER_MPIXELS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld},\n",
-           pdf_single->threads, pdf_single->throughput, pdf_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld}},\n",
-           pdf_multi->threads, pdf_multi->throughput, pdf_multi->score);
-    printf("    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
-           "\"classes\": %u, \"task_photos\": %llu, \"baseline_ips\": %.1f,\n",
-           PL_WORKLOAD_SLUG, PL_PHOTOS, PL_PHOTO_W, PL_PHOTO_H,
-           PL_CLASSES, (unsigned long long)pl_photos,
-           BASELINE_PHOTOLIBRARY_IPS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_ips\": %.1f, "
-           "\"score\": %ld},\n",
-           pl_single->threads, pl_single->throughput, pl_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_ips\": %.1f, "
-           "\"score\": %ld}},\n",
-           pl_multi->threads, pl_multi->throughput, pl_multi->score);
-    printf("    {\"name\": \"%s\", \"units\": %u, \"tokens\": %llu, "
-           "\"baseline_ktokens\": %.1f,\n",
-           CL_WORKLOAD_SLUG, CLANG_UNITS, (unsigned long long)cl_tokens,
-           BASELINE_CLANG_KTOKENS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_ktokens\": %.1f, "
-           "\"score\": %ld},\n",
-           cl_single->threads, cl_single->throughput, cl_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_ktokens\": %.1f, "
-           "\"score\": %ld}},\n",
-           cl_multi->threads, cl_multi->throughput, cl_multi->score);
-    printf("    {\"name\": \"%s\", \"docs\": %u, \"patterns_per_doc\": %u, "
-           "\"task_bytes\": %llu, \"baseline_mbps\": %.1f,\n",
-           TP_WORKLOAD_SLUG, TP_DOCS, TP_PATTERNS,
-           (unsigned long long)tp_bytes, BASELINE_TEXTPROCESSING_MBPS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
-           "\"score\": %ld},\n",
-           tp_single->threads, tp_single->throughput, tp_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
-           "\"score\": %ld}},\n",
-           tp_multi->threads, tp_multi->throughput, tp_multi->score);
-    printf("    {\"name\": \"%s\", \"assets\": %u, \"textures\": %u, "
-           "\"meshes\": %u, \"task_bytes\": %llu, \"baseline_mbps\": %.1f,\n",
-           AC_WORKLOAD_SLUG, AC_ASSETS, AC_TEXTURES + AC_ALPHA_TEXTURES,
-           AC_MESHES, (unsigned long long)ac_bytes,
-           BASELINE_ASSETCOMPRESSION_MBPS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
-           "\"score\": %ld},\n",
-           ac_single->threads, ac_single->throughput, ac_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
-           "\"score\": %ld}},\n",
-           ac_multi->threads, ac_multi->throughput, ac_multi->score);
-    printf("    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
-           "\"task_images\": %llu, \"baseline_ips\": %.1f,\n",
-           OD_WORKLOAD_SLUG, OD_PHOTOS, OD_INPUT_W, OD_INPUT_H,
-           (unsigned long long)od_images, BASELINE_OBJDETECTION_IPS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_ips\": %.1f, "
-           "\"score\": %ld},\n",
-           od_single->threads, od_single->throughput, od_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_ips\": %.1f, "
-           "\"score\": %ld}},\n",
-           od_multi->threads, od_multi->throughput, od_multi->score);
-    printf("    {\"name\": \"%s\", \"frames\": %u, \"view\": \"%ux%u\", "
-           "\"task_frames\": %llu, \"baseline_fps\": %.1f,\n",
-           BB_WORKLOAD_SLUG, BB_FRAMES, BB_FRAME_W, BB_FRAME_H,
-           (unsigned long long)bb_frames, BASELINE_BACKGROUNDBLUR_FPS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_fps\": %.1f, "
-           "\"score\": %ld},\n",
-           bb_single->threads, bb_single->throughput, bb_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_fps\": %.1f, "
-           "\"score\": %ld}},\n",
-           bb_multi->threads, bb_multi->throughput, bb_multi->score);
-    printf("    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
-           "\"task_pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
-           OR_WORKLOAD_SLUG, OR_PHOTOS, OR_PHOTO_W, OR_PHOTO_H,
-           (unsigned long long)or_pixels, BASELINE_OBJECTREMOVER_MPIXELS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld},\n",
-           or_single->threads, or_single->throughput, or_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld}},\n",
-           or_multi->threads, or_multi->throughput, or_multi->score);
-    printf("    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
-           "\"task_pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
-           HD_WORKLOAD_SLUG, HD_PHOTOS, HD_PHOTO_W, HD_PHOTO_H,
-           (unsigned long long)hd_pixels,
-           BASELINE_HORIZONDETECTION_MPIXELS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld},\n",
-           hd_single->threads, hd_single->throughput, hd_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld}},\n",
-           hd_multi->threads, hd_multi->throughput, hd_multi->score);
-    printf("    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
-           "\"task_pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
-           PF_WORKLOAD_SLUG, PF_PHOTOS, PF_PHOTO_W, PF_PHOTO_H,
-           (unsigned long long)pf_pixels, BASELINE_PHOTOFILTER_MPIXELS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld},\n",
-           pf_single->threads, pf_single->throughput, pf_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld}},\n",
-           pf_multi->threads, pf_multi->throughput, pf_multi->score);
-    printf("    {\"name\": \"%s\", \"scenes\": %u, \"exposures\": %u, "
-           "\"view\": \"%ux%u\", \"task_pixels\": %llu, "
-           "\"baseline_mpixels\": %.1f,\n",
-           HDR_WORKLOAD_SLUG, HDR_SCENES, HDR_EXPOSURES, HDR_SCENE_W,
-           HDR_SCENE_H, (unsigned long long)hdr_pixels,
-           BASELINE_HDR_MPIXELS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld},\n",
-           hdr_single->threads, hdr_single->throughput, hdr_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
-           "\"score\": %ld}},\n",
-           hdr_multi->threads, hdr_multi->throughput, hdr_multi->score);
-    printf("    {\"name\": \"%s\", \"views\": %u, \"view\": \"%ux%u\", "
-           "\"triangles\": %u, \"task_rays\": %llu, \"baseline_mrays\": %.1f,\n",
-           RT_WORKLOAD_SLUG, RT_VIEWS, RT_VIEW_W, RT_VIEW_H,
-           rt_triangles, (unsigned long long)rt_rays,
-           BASELINE_RAYTRACER_MRAYS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_mrays\": %.1f, "
-           "\"score\": %ld},\n",
-           rt_single->threads, rt_single->throughput, rt_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_mrays\": %.1f, "
-           "\"score\": %ld}},\n",
-           rt_multi->threads, rt_multi->throughput, rt_multi->score);
-    printf("    {\"name\": \"%s\", \"pairs\": %u, \"view\": \"%ux%u\", "
-           "\"scene_points\": %u, \"task_pairs\": %llu, "
-           "\"baseline_pairs\": %.1f,\n",
-           SFM_WORKLOAD_SLUG, SFM_PAIRS, SFM_VIEW_W, SFM_VIEW_H,
-           SFM_SCENE_POINTS, (unsigned long long)sfm_pairs,
-           BASELINE_SFM_PAIRS);
-    printf("     \"single\": {\"threads\": %u, \"throughput_pairs\": %.1f, "
-           "\"score\": %ld},\n",
-           sfm_single->threads, sfm_single->throughput, sfm_single->score);
-    printf("     \"multi\": {\"threads\": %u, \"throughput_pairs\": %.1f, "
-           "\"score\": %ld}}\n",
-           sfm_multi->threads, sfm_multi->throughput, sfm_multi->score);
-    printf("  ]\n");
-    printf("}\n");
+    fprintf(out,
+            "{\n");
+    fprintf(out,
+            "  \"benchmark\": \"lotofbench\",\n");
+    fprintf(out,
+            "  \"schema\": 1,\n");
+    fprintf(out,
+            "  \"version\": \"%s\",\n", LOTOFBENCH_VERSION);
+    fprintf(out,
+            "  \"seed\": %u,\n", opt->seed);
+    fprintf(out,
+            "  \"runs\": %u,\n", opt->runs);
+    fprintf(out,
+            "  \"workloads\": [\n");
+    fprintf(out,
+            "    {\"name\": \"%s\", \"corpus_mb\": %u, "
+            "\"baseline_mbps\": %.1f,\n",
+            FC_WORKLOAD_SLUG, opt->corpus_mb, BASELINE_FILECOMPRESSION_MBPS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
+            "\"score\": %ld},\n",
+            fc_single->threads, fc_single->throughput, fc_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
+            "\"score\": %ld}},\n",
+            fc_multi->threads, fc_multi->throughput, fc_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"grid_side\": %u, \"routes\": %u, "
+            "\"edges_relaxed\": %llu, \"baseline_medges\": %.1f,\n",
+            NAV_WORKLOAD_SLUG, NAV_GRID_SIDE, NAV_ROUTES,
+            (unsigned long long)nav_ops, BASELINE_NAVIGATION_MEDGES);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_medges\": %.1f, "
+            "\"score\": %ld},\n",
+            nav_single->threads, nav_single->throughput, nav_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_medges\": %.1f, "
+            "\"score\": %ld}},\n",
+            nav_multi->threads, nav_multi->throughput, nav_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"pages\": %u, \"view\": \"%ux%u\", "
+            "\"elements\": %llu, \"pages_rendered\": %llu, "
+            "\"baseline_pps\": %.1f,\n",
+            HTML5_WORKLOAD_SLUG, HTML5_PAGES, HTML5_VIEW_W, HTML5_VIEW_H,
+            (unsigned long long)h5_elements,
+            (unsigned long long)h5_pages, BASELINE_HTML5BROWSER_PPS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_pps\": %.1f, "
+            "\"score\": %ld},\n",
+            h5_single->threads, h5_single->throughput, h5_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_pps\": %.1f, "
+            "\"score\": %ld}},\n",
+            h5_multi->threads, h5_multi->throughput, h5_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"docs\": %u, \"pages_per_doc\": %u, "
+            "\"pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
+            PDF_WORKLOAD_SLUG, PDF_DOCS, PDF_PAGES_PER_DOC,
+            (unsigned long long)pdf_pixels, BASELINE_PDFRENDER_MPIXELS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld},\n",
+            pdf_single->threads, pdf_single->throughput, pdf_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld}},\n",
+            pdf_multi->threads, pdf_multi->throughput, pdf_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
+            "\"classes\": %u, \"task_photos\": %llu, "
+            "\"baseline_ips\": %.1f,\n",
+            PL_WORKLOAD_SLUG, PL_PHOTOS, PL_PHOTO_W, PL_PHOTO_H,
+            PL_CLASSES, (unsigned long long)pl_photos,
+            BASELINE_PHOTOLIBRARY_IPS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_ips\": %.1f, "
+            "\"score\": %ld},\n",
+            pl_single->threads, pl_single->throughput, pl_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_ips\": %.1f, "
+            "\"score\": %ld}},\n",
+            pl_multi->threads, pl_multi->throughput, pl_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"units\": %u, \"tokens\": %llu, "
+            "\"baseline_ktokens\": %.1f,\n",
+            CL_WORKLOAD_SLUG, CLANG_UNITS, (unsigned long long)cl_tokens,
+            BASELINE_CLANG_KTOKENS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_ktokens\": %.1f, "
+            "\"score\": %ld},\n",
+            cl_single->threads, cl_single->throughput, cl_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_ktokens\": %.1f, "
+            "\"score\": %ld}},\n",
+            cl_multi->threads, cl_multi->throughput, cl_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"docs\": %u, \"patterns_per_doc\": %u, "
+            "\"task_bytes\": %llu, \"baseline_mbps\": %.1f,\n",
+            TP_WORKLOAD_SLUG, TP_DOCS, TP_PATTERNS,
+            (unsigned long long)tp_bytes, BASELINE_TEXTPROCESSING_MBPS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
+            "\"score\": %ld},\n",
+            tp_single->threads, tp_single->throughput, tp_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
+            "\"score\": %ld}},\n",
+            tp_multi->threads, tp_multi->throughput, tp_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"assets\": %u, \"textures\": %u, "
+            "\"meshes\": %u, \"task_bytes\": %llu, \"baseline_mbps\": %.1f,\n",
+            AC_WORKLOAD_SLUG, AC_ASSETS, AC_TEXTURES + AC_ALPHA_TEXTURES,
+            AC_MESHES, (unsigned long long)ac_bytes,
+            BASELINE_ASSETCOMPRESSION_MBPS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
+            "\"score\": %ld},\n",
+            ac_single->threads, ac_single->throughput, ac_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mbps\": %.1f, "
+            "\"score\": %ld}},\n",
+            ac_multi->threads, ac_multi->throughput, ac_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
+            "\"task_images\": %llu, \"baseline_ips\": %.1f,\n",
+            OD_WORKLOAD_SLUG, OD_PHOTOS, OD_INPUT_W, OD_INPUT_H,
+            (unsigned long long)od_images, BASELINE_OBJDETECTION_IPS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_ips\": %.1f, "
+            "\"score\": %ld},\n",
+            od_single->threads, od_single->throughput, od_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_ips\": %.1f, "
+            "\"score\": %ld}},\n",
+            od_multi->threads, od_multi->throughput, od_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"frames\": %u, \"view\": \"%ux%u\", "
+            "\"task_frames\": %llu, \"baseline_fps\": %.1f,\n",
+            BB_WORKLOAD_SLUG, BB_FRAMES, BB_FRAME_W, BB_FRAME_H,
+            (unsigned long long)bb_frames, BASELINE_BACKGROUNDBLUR_FPS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_fps\": %.1f, "
+            "\"score\": %ld},\n",
+            bb_single->threads, bb_single->throughput, bb_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_fps\": %.1f, "
+            "\"score\": %ld}},\n",
+            bb_multi->threads, bb_multi->throughput, bb_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
+            "\"task_pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
+            OR_WORKLOAD_SLUG, OR_PHOTOS, OR_PHOTO_W, OR_PHOTO_H,
+            (unsigned long long)or_pixels, BASELINE_OBJECTREMOVER_MPIXELS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld},\n",
+            or_single->threads, or_single->throughput, or_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld}},\n",
+            or_multi->threads, or_multi->throughput, or_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
+            "\"task_pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
+            HD_WORKLOAD_SLUG, HD_PHOTOS, HD_PHOTO_W, HD_PHOTO_H,
+            (unsigned long long)hd_pixels,
+            BASELINE_HORIZONDETECTION_MPIXELS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld},\n",
+            hd_single->threads, hd_single->throughput, hd_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld}},\n",
+            hd_multi->threads, hd_multi->throughput, hd_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"photos\": %u, \"view\": \"%ux%u\", "
+            "\"task_pixels\": %llu, \"baseline_mpixels\": %.1f,\n",
+            PF_WORKLOAD_SLUG, PF_PHOTOS, PF_PHOTO_W, PF_PHOTO_H,
+            (unsigned long long)pf_pixels, BASELINE_PHOTOFILTER_MPIXELS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld},\n",
+            pf_single->threads, pf_single->throughput, pf_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld}},\n",
+            pf_multi->threads, pf_multi->throughput, pf_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"scenes\": %u, \"exposures\": %u, "
+            "\"view\": \"%ux%u\", \"task_pixels\": %llu, "
+            "\"baseline_mpixels\": %.1f,\n",
+            HDR_WORKLOAD_SLUG, HDR_SCENES, HDR_EXPOSURES, HDR_SCENE_W,
+            HDR_SCENE_H, (unsigned long long)hdr_pixels,
+            BASELINE_HDR_MPIXELS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld},\n",
+            hdr_single->threads, hdr_single->throughput, hdr_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mpixels\": %.1f, "
+            "\"score\": %ld}},\n",
+            hdr_multi->threads, hdr_multi->throughput, hdr_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"views\": %u, \"view\": \"%ux%u\", "
+            "\"triangles\": %u, \"task_rays\": %llu, "
+            "\"baseline_mrays\": %.1f,\n",
+            RT_WORKLOAD_SLUG, RT_VIEWS, RT_VIEW_W, RT_VIEW_H,
+            rt_triangles, (unsigned long long)rt_rays,
+            BASELINE_RAYTRACER_MRAYS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_mrays\": %.1f, "
+            "\"score\": %ld},\n",
+            rt_single->threads, rt_single->throughput, rt_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_mrays\": %.1f, "
+            "\"score\": %ld}},\n",
+            rt_multi->threads, rt_multi->throughput, rt_multi->score);
+    fprintf(out,
+            "    {\"name\": \"%s\", \"pairs\": %u, \"view\": \"%ux%u\", "
+            "\"scene_points\": %u, \"task_pairs\": %llu, "
+            "\"baseline_pairs\": %.1f,\n",
+            SFM_WORKLOAD_SLUG, SFM_PAIRS, SFM_VIEW_W, SFM_VIEW_H,
+            SFM_SCENE_POINTS, (unsigned long long)sfm_pairs,
+            BASELINE_SFM_PAIRS);
+    fprintf(out,
+            "     \"single\": {\"threads\": %u, \"throughput_pairs\": %.1f, "
+            "\"score\": %ld},\n",
+            sfm_single->threads, sfm_single->throughput, sfm_single->score);
+    fprintf(out,
+            "     \"multi\": {\"threads\": %u, \"throughput_pairs\": %.1f, "
+            "\"score\": %ld}}\n",
+            sfm_multi->threads, sfm_multi->throughput, sfm_multi->score);
+    fprintf(out,
+            "  ],\n");
+    fprintf(out,
+            "  \"sections\": {\n");
+    fprintf(out,
+            "    \"integer\": {\"single\": %ld, \"multi\": %ld},\n",
+            integer_single, integer_multi);
+    fprintf(out,
+            "    \"floating-point\": {\"single\": %ld, \"multi\": %ld}\n",
+            floating_single, floating_multi);
+    fprintf(out,
+            "  },\n");
+    fprintf(out,
+            "  \"composite\": {\"single\": %ld, \"multi\": %ld}\n",
+            composite_single, composite_multi);
+    fprintf(out,
+            "}\n");
 }
 
 int main(int argc, char **argv)
 {
     options opt = parse_args(argc, argv);
+    int status = 0;
+    FILE *json_out = NULL;
+
+    if (opt.json_out) {
+        json_out = fopen(opt.json_out, "w");
+        if (!json_out) {
+            fprintf(stderr, "lotofbench: cannot open '%s' for writing\n",
+                    opt.json_out);
+            return 1;
+        }
+    }
+
     fc_ctx *fc = fc_prepare(opt.corpus_mb, opt.seed);
     nav_ctx *nav = nav_prepare(opt.seed);
     html5_ctx *h5 = html5_prepare(opt.seed);
@@ -535,6 +628,8 @@ int main(int argc, char **argv)
         !bb || !orem || !hd || !pf || !hdr || !rt || !sfm) {
         fprintf(stderr,
                 "lotofbench: out of memory building the workload inputs\n");
+        if (json_out)
+            fclose(json_out);
         fc_free(fc);
         nav_free(nav);
         html5_free(h5);
@@ -611,6 +706,8 @@ int main(int argc, char **argv)
         run_sfm(sfm, opt.runs, opt.threads, &sfm_multi, &sfm_pairs) != 0) {
         fprintf(stderr,
                 "lotofbench: workload failed — a result did not verify\n");
+        if (json_out)
+            fclose(json_out);
         fc_free(fc);
         nav_free(nav);
         html5_free(h5);
@@ -630,9 +727,40 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* Composite scoring (docs/benchmarks.md "Scoring"): the section
+     * scores are the geometric means of their member workloads' scores
+     * and the composite the 65/35 weighted arithmetic mean of the two
+     * sections, the Geekbench 6 aggregation. */
+    long integer_single_scores[8] = {
+        fc_single.score, nav_single.score, h5_single.score,
+        pdf_single.score, pl_single.score, cl_single.score,
+        tp_single.score, ac_single.score
+    };
+    long integer_multi_scores[8] = {
+        fc_multi.score, nav_multi.score, h5_multi.score,
+        pdf_multi.score, pl_multi.score, cl_multi.score,
+        tp_multi.score, ac_multi.score
+    };
+    long floating_single_scores[8] = {
+        od_single.score, bb_single.score, orem_single.score,
+        hd_single.score, pf_single.score, hdr_single.score,
+        rt_single.score, sfm_single.score
+    };
+    long floating_multi_scores[8] = {
+        od_multi.score, bb_multi.score, orem_multi.score,
+        hd_multi.score, pf_multi.score, hdr_multi.score,
+        rt_multi.score, sfm_multi.score
+    };
+    long integer_single = lb_section(integer_single_scores, 8);
+    long integer_multi = lb_section(integer_multi_scores, 8);
+    long floating_single = lb_section(floating_single_scores, 8);
+    long floating_multi = lb_section(floating_multi_scores, 8);
+    long composite_single = lb_composite(integer_single, floating_single);
+    long composite_multi = lb_composite(integer_multi, floating_multi);
+
     if (opt.json) {
-        print_json(&opt, &fc_single, &fc_multi, &nav_single, &nav_multi,
-                   nav_ops, &h5_single, &h5_multi, h5_pages,
+        print_json(stdout, &opt, &fc_single, &fc_multi, &nav_single,
+                   &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
                    html5_elements(h5), &pdf_single, &pdf_multi,
                    pdf_pixels, &pl_single, &pl_multi, pl_photos,
                    &cl_single, &cl_multi, cl_tokens,
@@ -645,8 +773,35 @@ int main(int argc, char **argv)
                    &hdr_single, &hdr_multi, hdr_pixels,
                    &rt_single, &rt_multi, rt_rays,
                    (unsigned)rt_tri_count(rt), &sfm_single, &sfm_multi,
-                   sfm_pairs);
-    } else {
+                   sfm_pairs, integer_single, integer_multi,
+                   floating_single, floating_multi, composite_single,
+                   composite_multi);
+    }
+    if (json_out) {
+        print_json(json_out, &opt, &fc_single, &fc_multi, &nav_single,
+                   &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
+                   html5_elements(h5), &pdf_single, &pdf_multi,
+                   pdf_pixels, &pl_single, &pl_multi, pl_photos,
+                   &cl_single, &cl_multi, cl_tokens,
+                   &tp_single, &tp_multi, tp_bytes, &ac_single, &ac_multi,
+                   ac_bytes, &od_single, &od_multi, od_images,
+                   &bb_single, &bb_multi, bb_frames,
+                   &orem_single, &orem_multi, orem_pixels,
+                   &hd_single, &hd_multi,
+                   hd_pixels, &pf_single, &pf_multi, pf_pixels,
+                   &hdr_single, &hdr_multi, hdr_pixels,
+                   &rt_single, &rt_multi, rt_rays,
+                   (unsigned)rt_tri_count(rt), &sfm_single, &sfm_multi,
+                   sfm_pairs, integer_single, integer_multi,
+                   floating_single, floating_multi, composite_single,
+                   composite_multi);
+        if (fclose(json_out) != 0) {
+            fprintf(stderr, "lotofbench: error writing '%s'\n",
+                    opt.json_out);
+            status = 1;
+        }
+    }
+    if (!opt.json) {
         char fc_cfg[64], nav_cfg[64], h5_cfg[64], pdf_cfg[96], pl_cfg[96],
              cl_cfg[64], tp_cfg[64], ac_cfg[96], od_cfg[96], bb_cfg[96],
              hd_cfg[96], or_cfg[96], pf_cfg[96], hdr_cfg[64], rt_cfg[96],
@@ -748,6 +903,14 @@ int main(int argc, char **argv)
                     &rt_multi);
         printf("\n%s (%s)\n", SFM_WORKLOAD_NAME, sfm_cfg);
         print_block("pairs/s", BASELINE_SFM_PAIRS, &sfm_single, &sfm_multi);
+
+        printf("\nComposite Score (Integer 65%% / Floating Point 35%%)\n");
+        printf("  Single-Core\n");
+        printf("    score       %9ld   (Integer %ld, Floating Point %ld)\n\n",
+               composite_single, integer_single, floating_single);
+        printf("  Multi-Core\n");
+        printf("    score       %9ld   (Integer %ld, Floating Point %ld)\n",
+               composite_multi, integer_multi, floating_multi);
     }
 
     fc_free(fc);
@@ -766,5 +929,5 @@ int main(int argc, char **argv)
     hdr_free(hdr);
     rt_free(rt);
     sfm_free(sfm);
-    return 0;
+    return status;
 }
