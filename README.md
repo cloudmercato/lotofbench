@@ -2,8 +2,9 @@
 
 An open-source, dependency-free CPU benchmark in C, modelled on the
 structure of Primate Labs' [Geekbench 6](https://www.geekbench.com):
-identifiable workloads, single-core and multi-core results, and a
-relative score against a fixed baseline.
+identifiable workloads, single-core and multi-core results, a relative
+score against a fixed baseline per workload, and a Geekbench-6-style
+composite (geometric section means, weighted 65/35).
 
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
@@ -126,139 +127,40 @@ C11 compiler, Linux/macOS/BSD.
 ## Usage
 
 ```sh
-./lotofbench [--size-mb N] [--runs N] [--threads N] [--seed N] [--json]
+./lotofbench [--size-mb N] [--runs N] [--threads N] [--seed N] \
+             [--json] [--json-out PATH]
 ```
 
 Defaults: 100 MB corpus, 5 runs (median), one thread per online CPU.
-`--json` emits machine-readable results. `--size-mb` sizes the File
-Compression corpus; every other workload uses fixed-size inputs (the
-map is the map, the pages are the pages) that vary only with `--seed`.
+`--json` prints machine-readable results (schema 1: top-level `schema`,
+`sections` and `composite` keys alongside the per-workload `workloads`
+array). `--json-out PATH` additionally stores that JSON document in a
+file while the usual text report goes to stdout. `--size-mb` sizes the
+File Compression corpus; every other workload uses fixed-size inputs
+(the map is the map, the pages are the pages) that vary only with
+`--seed`.
 
-Real output on the development box (12 threads, defaults):
-
-```
-LotofBench 0.11.0
-seed 1, 5 runs, median
-
-File Compression (corpus 100 MB synthetic)
-Single-Core
-  throughput      107.8 MB/s
-  score             431   (baseline 250.0 MB/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput      608.0 MB/s
-  score            2432
-
-Navigation (grid 512x512, 64 routes)
-Single-Core
-  throughput       43.6 Medge/s
-  score             436   (baseline 100.0 Medge/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput      233.7 Medge/s
-  score            2337
-
-HTML5 Browser (32 pages, 800x600 viewport, 3544 DOM elements)
-Single-Core
-  throughput      302.4 pages/s
-  score             465   (baseline 650.0 pages/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput     2352.0 pages/s
-  score            3618
-
-PDF Render (4 park maps, 2 pages each, 1224x1584 px @2x)
-Single-Core
-  throughput        3.1 Mpixel/s
-  score             308   (baseline 10.0 Mpixel/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput       13.9 Mpixel/s
-  score            1391
-
-Photo Library (16 photos, 1280x960 px, 8 classes)
-Single-Core
-  throughput      193.1 img/s
-  score             966   (baseline 200.0 img/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput      949.8 img/s
-  score            4749
-
-Clang (32 units, 986328 source tokens)
-Single-Core
-  throughput     4728.5 Ktokens/s
-  score             556   (baseline 8500.0 Ktokens/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput    23312.5 Ktokens/s
-  score            2743
-
-Text Processing (32 docs, 8 patterns/doc)
-Single-Core
-  throughput       97.3 MB/s
-  score             487   (baseline 200.0 MB/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput      288.9 MB/s
-  score            1445
-
-Asset Compression (16 assets (12 textures, 4 meshes))
-Single-Core
-  throughput       46.5 MB/s
-  score             930   (baseline 50.0 MB/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput      212.4 MB/s
-  score            4248
-
-Horizon Detection (8 photos, 1600x1200 px, 6 archetypes, Canny+Hough)
-Single-Core
-  throughput       50.2 Mpixel/s
-  score            1004   (baseline 50.0 Mpixel/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput      292.4 Mpixel/s
-  score            5848
-
-Photo Filter (10 photos, 1600x1200 px, 6 archetypes)
-Single-Core
-  throughput       28.5 Mpixel/s
-  score             570   (baseline 50.0 Mpixel/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput      151.2 Mpixel/s
-  score            3023
-
-HDR (4 scenes x 6 exposures, 1600x1200 px, Mertens fusion)
-Single-Core
-  throughput        5.6 Mpixel/s
-  score             940   (baseline 6.0 Mpixel/s = 1000)
-
-Multi-Core (4 threads, shared task)
-  throughput       20.3 Mpixel/s
-  score            3387
-
-Ray Tracer (8 views, 480x360 px, 984 triangles, Whitted)
-Single-Core
-  throughput        5.1 Mray/s
-  score            1026   (baseline 5.0 Mray/s = 1000)
-
-Multi-Core (12 threads, shared task)
-  throughput       26.9 Mray/s
-  score            5385
-
-Structure from Motion (12 pairs, 640x480 px, 544 scene points, FAST+RANSAC)
-Single-Core
-  throughput       36.9 pairs/s
-  score             369   (baseline 100.0 pairs/s = 1000)
-
-Multi-Core (4 threads, shared task)
-  throughput      133.9 pairs/s
-  score            1339
-```
+Real output of a default run on the development box (12 threads) is
+kept in [docs/sample-output.md](docs/sample-output.md), with the same
+run's machine-readable results in
+[docs/sample-output.json](docs/sample-output.json).
 
 ## What it measures
+
+### Composite Score
+
+Published alongside the per-workload scores, the Geekbench 6 way. The
+workloads are split into an Integer section (File Compression,
+Navigation, HTML5 Browser, PDF Render, Photo Library, Clang, Text
+Processing, Asset Compression) and a Floating-Point section (Object
+Detection, Background Blur, Object Remover, Horizon Detection, Photo
+Filter, HDR, Ray Tracer, Structure from Motion). Each section score is
+the geometric mean of its member workloads' scores, rounded half up;
+the composite is the weighted arithmetic mean of the two sections
+(65% Integer / 35% Floating Point), rounded half up. A machine
+scoring exactly 1000 on every workload scores 1000 on the composite.
+Both single-core and multi-core composites are published — and never
+compared with Geekbench scores (own baselines).
 
 ### File Compression
 
@@ -428,7 +330,7 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 171 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 188 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
@@ -486,6 +388,8 @@ src/main.c                    CLI, suite order, output
 tests/                        the unit-test suite (make test)
 tools/gen_goldens.c           regenerates the golden pins of the tests
 docs/benchmarks.md            the workload list, methodology and scoring rules
+docs/sample-output.md         a captured default run (text report, composite included)
+docs/sample-output.json       the same run's JSON document (schema 1)
 ROADMAP.md                    remaining workloads, cross-cutting plan, test rules
 ```
 

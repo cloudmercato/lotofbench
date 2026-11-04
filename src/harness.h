@@ -27,6 +27,19 @@ double lb_median(double *values, size_t n);
 /* The Geekbench scoring formula: score = throughput / baseline * 1000. */
 long lb_score(double throughput, double baseline);
 
+/* Geometric mean of n workload scores. Returns 0.0 when n is zero or
+ * any score is not positive (a dead workload kills its section). */
+double lb_geomean(const long *scores, size_t n);
+
+/* A published section score: the geometric mean of the member workloads'
+ * scores, rounded half up like the per-workload scores. */
+long lb_section(const long *scores, size_t n);
+
+/* The composite score, the Geekbench 6 aggregation: the weighted
+ * arithmetic mean of the two published section scores (65% Integer,
+ * 35% Floating Point, see lotofbench.h), rounded half up. */
+long lb_composite(long integer_score, long floating_score);
+
 /* Run `runs` synchronised runs of `cycle` over `threads` pre-built
  * contexts. On success fills elapsed[0..runs) with the per-run wall-clock
  * seconds (gate-open to last-thread-out) and returns 0. Returns -1 if

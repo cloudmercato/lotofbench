@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.16.0"
+#define LOTOFBENCH_VERSION   "1.0.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -167,5 +167,14 @@ typedef struct {
     double   throughput; /* MB/s or Medge/s, workload-dependent */
     long     score;
 } lb_result;
+
+/* Composite scoring — the Geekbench 6 aggregation, documented in
+ * docs/benchmarks.md ("Scoring"): the Integer and Floating-Point section
+ * scores are the geometric means of their member workloads' scores, and
+ * the composite is the weighted arithmetic mean of the two sections.
+ * LotofBench scores remain its own calibration and are NOT comparable
+ * with Geekbench scores (own baselines). */
+#define LB_INTEGER_WEIGHT    0.65
+#define LB_FLOATING_WEIGHT   0.35
 
 #endif /* LOTOFBENCH_H */

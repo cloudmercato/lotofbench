@@ -941,9 +941,8 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with fifteen
-workloads there is still nothing to aggregate, so each workload
-publishes its own score.
+adopts the same aggregation (see [The composite score](#the-composite-score));
+per-workload scores are still published alongside.
 
 - `BASELINE_FILECOMPRESSION_MBPS` = **250.0 MB/s** = 1000 (workload #1).
 - `BASELINE_NAVIGATION_MEDGES` = **100.0 Medge/s** = 1000 (workload #2)
@@ -986,6 +985,34 @@ publishes its own score.
 - `BASELINE_SFM_PAIRS` = **100.0 pairs/s** = 1000 (workload #16) — the
   reference machine reconstructs 100 image pairs per second (the
   12-pair set in about 120 ms single-core).
+
+### The composite score
+
+Since 1.0.0 the suite publishes, in addition to the per-workload
+scores, a composite score per core mode, computed the Geekbench 6 way.
+Each workload belongs to one of two sections — the grouping of
+ROADMAP.md's section tables (Geekbench 6 does not publish its own
+membership):
+
+- **Integer (65%)** — File Compression, Navigation, HTML5 Browser,
+  PDF Render, Photo Library, Clang, Text Processing, Asset
+  Compression.
+- **Floating Point (35%)** — Object Detection, Background Blur, Object
+  Remover, Horizon Detection, Photo Filter, HDR, Ray Tracer, Structure
+  from Motion.
+
+A section score is the **geometric mean** of its member workloads'
+scores, rounded half up like the per-workload scores; the composite is
+the **weighted arithmetic mean** of the two published section scores
+(65% Integer / 35% Floating Point, the weights in `src/lotofbench.h`),
+rounded half up. Single-core and multi-core composites are computed
+the same way from their own per-workload scores. A machine scoring
+exactly 1000 on every workload scores 1000 in both sections and 1000
+on the composite; because the section means are geometric, a workload
+scoring 0 (a dead or failed pipeline, which in fact aborts the run)
+would zero its section rather than drag the mean. The aggregation
+lives in `src/harness.c` (`lb_geomean`, `lb_section`,
+`lb_composite`).
 
 ## Multi-core model
 
