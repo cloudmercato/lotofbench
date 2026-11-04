@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Golden pins produced by tools/gen_goldens (v0.11.0, seed 1). After a
+/* Golden pins produced by tools/gen_goldens (v0.12.0, seed 1). After a
  * DELIBERATE change to the scene generator or the reconstruction
  * pipeline, re-run the tool and port the printed values here in the
  * same commit. */

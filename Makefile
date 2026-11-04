@@ -23,6 +23,7 @@ SRC = src/main.c \
       src/workload_clang.c \
       src/workload_textprocessing.c \
       src/workload_photofilter.c \
+      src/workload_assetcompression.c \
       src/itrig.c \
       src/workload_horizon.c \
       src/workload_raytracer.c \
@@ -43,6 +44,7 @@ HDR = src/lotofbench.h \
       src/workload_clang.h \
       src/workload_textprocessing.h \
       src/workload_photofilter.h \
+      src/workload_assetcompression.h \
       src/itrig.h \
       src/workload_horizon.h \
       src/workload_raytracer.h \
@@ -64,6 +66,7 @@ TESTS_SRC = tests/runner.c \
             tests/test_workload_photolibrary.c \
             tests/test_workload_clang.c \
             tests/test_workload_textprocessing.c \
+            tests/test_workload_assetcompression.c \
             tests/test_imgops.c \
             tests/test_workload_photofilter.c \
             tests/test_workload_horizon.c \

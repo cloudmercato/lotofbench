@@ -20,6 +20,7 @@
 #include "lz4.h"
 #include "rng.h"
 #include "sha1.h"
+#include "workload_assetcompression.h"
 #include "workload_clang.h"
 #include "workload_compression.h"
 #include "workload_horizon.h"
@@ -283,6 +284,50 @@ int main(void)
     printf("\nRT_SEED1_TASK_PIXELS_MULTI %llu",
            (unsigned long long)rt_task_pixels(1));
     rt_free(rt);
+
+    /* asset compression: seed-1 asset 0 (opaque texture) image digest +
+     * both BC1 pass references, asset 8 (alpha texture) + its BC3
+     * reference, asset 12 (mesh) shape + geometry stream references */
+    {
+        ac_ctx *ac = ac_prepare(1);
+
+        if (!ac)
+            return 1;
+        const ac_image *im = ac_asset_image(ac, 0);
+
+        sha1_hex(im->rgba, (size_t)im->w * im->h * 4, hex);
+        printf("\nAC_SEED1_TEX0_SHA1 %s", hex);
+        for (unsigned p = 0; p < 2; p++) {
+            const ac_reference *ref = ac_asset_reference(ac, 0, p);
+
+            printf("\nAC_SEED1_TEX0_P%u stream=%s decoded=%s err=%llu", p,
+                   ref->stream_hex, ref->decoded_hex,
+                   (unsigned long long)ref->error);
+        }
+        im = ac_asset_image(ac, 8);
+        sha1_hex(im->rgba, (size_t)im->w * im->h * 4, hex);
+        printf("\nAC_SEED1_ALPHA0_SHA1 %s", hex);
+        {
+            const ac_reference *ref = ac_asset_reference(ac, 8, 0);
+
+            printf("\nAC_SEED1_ALPHA0_P0 stream=%s decoded=%s err=%llu",
+                   ref->stream_hex, ref->decoded_hex,
+                   (unsigned long long)ref->error);
+        }
+        {
+            const ac_mesh *m = ac_asset_mesh(ac, 12);
+            const ac_reference *ref = ac_asset_reference(ac, 12, 0);
+
+            printf("\nAC_SEED1_MESH0 vc=%u ic=%u stream=%s decoded=%s aux=%s",
+                   m->vertex_count, m->index_count, ref->stream_hex,
+                   ref->decoded_hex, ref->aux_hex);
+        }
+        printf("\nAC_SEED1_TASK_BYTES %llu",
+               (unsigned long long)ac_task_bytes(ac, 0));
+        printf("\nAC_SEED1_TASK_BYTES_MULTI %llu",
+               (unsigned long long)ac_task_bytes(ac, 1));
+        ac_free(ac);
+    }
 
     /* structure from motion: seed-1 pair 0 reference (reconstruction
      * digest + exact counters), the left view 0 frame digest, the

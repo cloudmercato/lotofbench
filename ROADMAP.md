@@ -59,7 +59,14 @@ list and implementation status live in
   in-memory record store with integrity queries — the SQLite
   stand-in; every thumbnail SHA-1-verified, img/s metric) + the shared
   `img_box_downscale` kernel in `src/imgops.c`.
-- **v0.11** — Workload #16 Structure from Motion (twelve seeded stereo
+- **v0.11** — Workload #8 Asset Compression (16 seeded assets — eight
+  opaque 256x256 textures, four alpha textures, four triangle-strip
+  meshes — through from-scratch BC1 block codecs at two encoder
+  efforts, BC3 for the alpha textures, and a Draco-style geometry
+  codec: 12-bit position quantization, parallelogram prediction,
+  zigzag + varints; every encoded stream, decoded artifact and encode
+  error verified against prepare-time references, MB/s metric).
+- **v0.12** — Workload #16 Structure from Motion (twelve seeded stereo
   pairs of a 544-point synthetic room through the full SfM pipeline:
   FAST-9 with ring-SAD non-max suppression, nearest-corner matching,
   Hartley-normalized 8-point RANSAC over cyclic-Jacobi eigensolvers,
@@ -73,9 +80,9 @@ list and implementation status live in
 
 ## Suggested landing order
 
-1. **#8 Asset Compression** — a from-scratch BC1-style block codec,
-   the strongest remaining Integer-section workload before composite
-   scoring can aggregate both sections.
+1. **#9 Object Detection** — a fixed deterministic quantized conv net,
+   the first Floating-Point workload; opens the composite-scoring
+   discussion.
 
 ## The remaining Geekbench 6 CPU workloads
 
@@ -92,7 +99,7 @@ the same grouping once it aggregates (see Composite scoring).
 | 5 | Photo Library | JPEG decode, thumbnails, MobileNet classify + SQLite | Synthetic photos → 1/4-1/8-1/16 box thumbnail ladder + fixed 8-filter int conv pass + nearest-centroid auto-tag + in-memory record store; metric images/s; verify thumbnail digests + planted tags — **implemented v0.10** |
 | 6 | Clang | Compiling the Lua interpreter | Lexer/parser/codegen of a small deterministic language subset (no system cc — that would break reproducibility); metric Ktokens/s; verify emitted bytes hash — **implemented v0.4** |
 | 7 | Text Processing | Regex parsing, Markdown→HTML | From-scratch regex engine (NFA or backtracking) + Markdown→HTML subset over synthetic texts; metric MB/s — **implemented v0.5** |
-| 8 | Asset Compression | ASTC/BC7/DXT5 texture codecs, Draco mesh | From-scratch BC1-style block codec over synthetic textures + simple mesh quantization; metric Mpixels/s |
+| 8 | Asset Compression | ASTC/BC7/DXT5 texture codecs, Draco mesh | From-scratch BC1/BC3 block codecs (two encoder efforts) over synthetic textures + Draco-style quantize/parallelogram/zigzag/varint geometry codec; metric MB/s; verify stream + artifact digests + exact encode error — **implemented v0.11** |
 
 ### Floating-Point section
 
@@ -105,7 +112,7 @@ the same grouping once it aggregates (see Composite scoring).
 | 13 | Photo Filter | Color/blur filters, crop, scale | Gaussian/box blur, saturation, crop+scale pipelines over synthetic images; metric Mpixels/s — **implemented v0.7** |
 | 14 | HDR | Blending six 16 MP SDR photos | Simplified exposure-fusion (pyramid blend) over six synthetic exposures; metric Mpixels/s |
 | 15 | Ray Tracer | Blender BMW scene, Embree-style | Whitted-style tracer with a BVH over a deterministic synthetic scene; metric Mrays/s; verify pixel hash — **implemented v0.9** |
-| 16 | Structure from Motion | 3D geometry from 2D image pairs | FAST-9 detection + 8-point RANSAC essential + midpoint triangulation over synthetic stereo pairs; verify reprojection error and planted pose; metric pairs/s — **implemented v0.11** |
+| 16 | Structure from Motion | 3D geometry from 2D image pairs | FAST-9 detection + 8-point RANSAC essential + midpoint triangulation over synthetic stereo pairs; verify reprojection error and planted pose; metric pairs/s — **implemented v0.12** |
 
 ## Cross-cutting
 

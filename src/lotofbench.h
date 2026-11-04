@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.11.0"
+#define LOTOFBENCH_VERSION   "0.12.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -33,6 +33,8 @@
 #define RT_WORKLOAD_SLUG     "ray-tracer"
 #define SFM_WORKLOAD_NAME    "Structure from Motion"
 #define SFM_WORKLOAD_SLUG    "structure-from-motion"
+#define AC_WORKLOAD_NAME     "Asset Compression"
+#define AC_WORKLOAD_SLUG     "asset-compression"
 
 /* Suite and harness defaults — all overridable on the command line
  * (except the thread cap). */
@@ -83,6 +85,12 @@
  * Markdown-to-HTML). The 1000-point reference machine processes about
  * 200 million bytes per second. */
 #define BASELINE_TEXTPROCESSING_MBPS  200.0
+
+/* Workload #8 — Asset Compression: megabytes of asset input per second
+ * (textures through the BC1/BC3 block codecs, meshes through the
+ * geometry codec). The 1000-point reference machine pushes 50.0 MB of
+ * asset input per second (the 16-asset set in about 93 ms single-core). */
+#define BASELINE_ASSETCOMPRESSION_MBPS 50.0
 
 /* Workload #13 — Photo Filter: millions of output pixels per second
  * (each photo contributes its full 1600x1200 filtered frame). The

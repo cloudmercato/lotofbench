@@ -143,6 +143,19 @@ void test_tp_run_sane(void);
 void test_tp_accessors_null_safe(void);
 void test_tp_golden(void);
 
+/* --- workload #8: asset compression -------------------------------------------------*/
+void test_ac_textures_deterministic(void);
+void test_ac_input_invariants(void);
+void test_ac_bc1_units(void);
+void test_ac_bc3_units(void);
+void test_ac_mesh_units(void);
+void test_ac_mesh_foreign_orders(void);
+void test_ac_corpus_golden(void);
+void test_ac_seed_variation(void);
+void test_ac_run_sane(void);
+void test_ac_thread_clamp(void);
+void test_ac_accessors_null_safe(void);
+
 /* --- imgops: shared deterministic image kernels ------------------------------------------*/
 void test_img_levels(void);
 void test_img_color_matrix(void);
