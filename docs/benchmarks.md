@@ -231,7 +231,11 @@ v0.10 reproduces the shape of that import session, dependency-free:
   class of its photo (the corpus generator plants it, so a wrong tag
   means the classifier — or the corpus — is broken and the run aborts
   instead of scoring). The 16-photo corpus itself is only accepted if
-  all 16 photos classify correctly at prepare time.
+  all 16 photos classify correctly at prepare time: a photo whose
+  seeded shapes carry it across a nearest-centroid boundary is
+  redrawn deterministically from the same stream until it verifies
+  (attempt 0 is the plain seeded draw, the attempt count is part of
+  the seeded data).
 - **Record store (the SQLite stand-in)**: one record per ingested
   photo — id, class tag, luma probe, largest thumbnail size, a
   4-byte integrity tag from the thumbnail digest — inserted into a

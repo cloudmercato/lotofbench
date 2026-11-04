@@ -452,24 +452,30 @@ pl_ctx *pl_prepare(unsigned seed)
             return NULL;
         }
         ctx->cls[p] = p % PL_CLASSES;
-        gen_photo(ctx->photo[p], ctx->cls[p], &rng);
-
-        /* the thumbnail ladder + references, exactly as the timed
-         * cycle will rebuild them */
-        for (unsigned t = 0; t < PL_THUMBS; t++) {
-            img_box_downscale(thumb[t], tdim[t][0], tdim[t][1],
-                              ctx->photo[p], PL_PHOTO_W, PL_PHOTO_H);
-            sha1(thumb[t], tbytes[t], ctx->ref_digest[p][t]);
-        }
-
         /* the corpus is only valid if the classifier recovers the
-         * planted class of every photo — abort loudly otherwise */
-        {
+         * planted class of every photo. Big accent shapes can carry a
+         * photo across the nearest-centroid boundary on some draws, so
+         * the photo is redrawn deterministically from the same stream
+         * until it verifies — attempt 0 is the plain seeded draw and
+         * the attempt count is part of the seeded data. */
+        for (unsigned attempt = 0;; attempt++) {
             uint16_t feat[PL_FEATURE_DIMS];
+
+            gen_photo(ctx->photo[p], ctx->cls[p], &rng);
+
+            /* the thumbnail ladder + references, exactly as the timed
+             * cycle will rebuild them */
+            for (unsigned t = 0; t < PL_THUMBS; t++) {
+                img_box_downscale(thumb[t], tdim[t][0], tdim[t][1],
+                                  ctx->photo[p], PL_PHOTO_W, PL_PHOTO_H);
+                sha1(thumb[t], tbytes[t], ctx->ref_digest[p][t]);
+            }
 
             pl_extract_features(thumb[1], PL_CLS_W, PL_CLS_H, feat,
                                 scratch);
-            if (pl_classify(feat, ctx) != ctx->cls[p]) {
+            if (pl_classify(feat, ctx) == ctx->cls[p])
+                break;
+            if (attempt == 7u) {
                 fprintf(stderr,
                         "lotofbench: photo-library: photo %u classified "
                         "as class %u, planted %u — corpus broken\n",
