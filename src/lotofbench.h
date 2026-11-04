@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.14.0"
+#define LOTOFBENCH_VERSION   "0.15.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -37,6 +37,8 @@
 #define RT_WORKLOAD_SLUG     "ray-tracer"
 #define SFM_WORKLOAD_NAME    "Structure from Motion"
 #define SFM_WORKLOAD_SLUG    "structure-from-motion"
+#define HDR_WORKLOAD_NAME    "HDR"
+#define HDR_WORKLOAD_SLUG    "hdr"
 #define AC_WORKLOAD_NAME     "Asset Compression"
 #define AC_WORKLOAD_SLUG     "asset-compression"
 
@@ -136,6 +138,16 @@
  * reconstructs 100.0 pairs per second (a 12-pair set in ~120 ms
  * single-core). */
 #define BASELINE_SFM_PAIRS            100.0
+
+/* Workload #14 — HDR: millions of fused output pixels per second
+ * (each scene's six 1600x1200 exposures through the full exposure-
+ * fusion pyramid, contributing its one fused frame). The 1000-point
+ * reference machine fuses 6.0 million pixels per second — the full
+ * 4-scene set (7.68 Mpx) in ~1.28 s single-core, scalar plain-C speed.
+ * Chosen as a round yardstick next to the probe measurement: 5.76
+ * Mpx/s on the development box *under load ~2*, so the true idle rate
+ * sits just above the constant. */
+#define BASELINE_HDR_MPIXELS          6.0
 
 /* One published workload result (single- or multi-core). */
 typedef struct {

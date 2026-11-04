@@ -245,4 +245,19 @@ void test_bb_run_sane(void);
 void test_bb_thread_clamp(void);
 void test_bb_accessors_null_safe(void);
 
+/* --- workload 14: hdr -------------------------------------------------------*/
+void test_hdr_scenes_deterministic(void);
+void test_hdr_input_invariants(void);
+void test_hdr_weight_units(void);
+void test_hdr_normalize_units(void);
+void test_hdr_down_units(void);
+void test_hdr_expand_units(void);
+void test_hdr_flat_fusion_exact(void);
+void test_hdr_process_reproducible(void);
+void test_hdr_corpus_golden(void);
+void test_hdr_seed_variation(void);
+void test_hdr_run_sane(void);
+void test_hdr_thread_clamp(void);
+void test_hdr_accessors_null_safe(void);
+
 #endif /* LOTOFBENCH_TESTS_H */

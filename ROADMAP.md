@@ -107,14 +107,28 @@ list and implementation status live in
   differential of the whole pipeline against an independently written
   naive reference and ground-truth checks that the subject stays
   sharp while the far background is exactly the blurred frame.
+- **v0.15** — Workload #14 HDR (four seeded 1600x1200 scenes — backlit
+  window, sunset, gallery, night street — each mapped onto a
+  six-exposure bracket 1 EV apart whose bright stops clip the
+  highlights and whose dark stops drown the shadows, through a
+  100%-integer Mertens-style exposure fusion: fixed-point weight maps
+  (contrast, saturation, well-exposedness), per-pixel normalization
+  summing to exactly 255, 6-level Laplacian and weight pyramids,
+  per-level int32 blending and a signed 16.16 collapse; every timed
+  cycle verifies the SHA-1 of the normalized weight stack and of the
+  fused frame plus three exact counters against prepare-time
+  references, Mpixel/s metric) + 13 tests including the constant-plane
+  closed-form fusion (every pyramid level of a constant plane is that
+  constant, so the fused value reduces to the documented weight math
+  and is checked to the bit) and the kernel units for the weights,
+  the normalization, the downsample and the expand.
 
 ## Suggested landing order
 
 1. ~~#9 Object Detection~~ — **landed in v0.13**.
-2. ~~#10 Background Blur~~ — **landed in v0.14**; next in line:
-3. **#11 Object Remover** — iterative Laplacian/pyramid inpainting.
-4. **#14 HDR** — exposure-fusion pyramid blend over six synthetic
-   exposures.
+2. ~~#10 Background Blur~~ — **landed in v0.14**.
+3. ~~#14 HDR~~ — **landed in v0.15**; next in line:
+4. **#11 Object Remover** — iterative Laplacian/pyramid inpainting.
 
 ## The remaining Geekbench 6 CPU workloads
 
@@ -142,7 +156,7 @@ the same grouping once it aggregates (see Composite scoring).
 | 11 | Object Remover | Inpainting (content-aware fill) | Iterative Laplacian/pyramid fill over synthetic masks; metric Mpixels/s |
 | 12 | Horizon Detection | Canny edges + Hough transform | From-scratch Canny + Hough over synthetic images with known horizons; metric Mpixels/s; verify detected line parameters against ground truth — **implemented v0.8** |
 | 13 | Photo Filter | Color/blur filters, crop, scale | Gaussian/box blur, saturation, crop+scale pipelines over synthetic images; metric Mpixels/s — **implemented v0.7** |
-| 14 | HDR | Blending six 16 MP SDR photos | Simplified exposure-fusion (pyramid blend) over six synthetic exposures; metric Mpixels/s |
+| 14 | HDR | Blending six 16 MP SDR photos | Simplified exposure-fusion (pyramid blend) over six synthetic exposures; metric Mpixels/s — **implemented v0.15** |
 | 15 | Ray Tracer | Blender BMW scene, Embree-style | Whitted-style tracer with a BVH over a deterministic synthetic scene; metric Mrays/s; verify pixel hash — **implemented v0.9** |
 | 16 | Structure from Motion | 3D geometry from 2D image pairs | FAST-9 detection + 8-point RANSAC essential + midpoint triangulation over synthetic stereo pairs; verify reprojection error and planted pose; metric pairs/s — **implemented v0.12** |
 

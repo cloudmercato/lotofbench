@@ -193,6 +193,20 @@ static const test_entry TESTS[] = {
     { "backgroundblur/run-sane", test_bb_run_sane },
     { "backgroundblur/thread-clamp", test_bb_thread_clamp },
     { "backgroundblur/null-accessors", test_bb_accessors_null_safe },
+
+    { "hdr/scenes-deterministic", test_hdr_scenes_deterministic },
+    { "hdr/input-invariants", test_hdr_input_invariants },
+    { "hdr/weight-units", test_hdr_weight_units },
+    { "hdr/normalize-units", test_hdr_normalize_units },
+    { "hdr/down-units", test_hdr_down_units },
+    { "hdr/expand-units", test_hdr_expand_units },
+    { "hdr/flat-fusion-exact", test_hdr_flat_fusion_exact },
+    { "hdr/process-reproducible", test_hdr_process_reproducible },
+    { "hdr/corpus-golden", test_hdr_corpus_golden },
+    { "hdr/seed-variation", test_hdr_seed_variation },
+    { "hdr/run-sane", test_hdr_run_sane },
+    { "hdr/thread-clamp", test_hdr_thread_clamp },
+    { "hdr/null-accessors", test_hdr_accessors_null_safe },
 };
 
 int main(void)
