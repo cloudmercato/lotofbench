@@ -22,7 +22,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 5 | Photo Library                 | JPEG decode, thumbnails, MobileNet classify + SQLite | **implemented v0.10** |
 | 6 | Clang                         | Compiling the Lua interpreter      | **implemented v0.4** |
 | 7 | Text Processing               | Regex parsing, Markdown→HTML (Python) | **implemented v0.5** |
-| 8 | Asset Compression             | ASTC/BC7/DXT5 texture codecs, Draco mesh | planned |
+| 8 | Asset Compression             | ASTC/BC7/DXT5 texture codecs, Draco mesh | **implemented v0.11** |
 | 9 | Object Detection              | MobileNet v1 SSD over photos       | planned |
 | 10| Background Blur               | DeepLabV3+ segmentation on video frames | planned |
 | 11| Object Remover                | Inpainting (content-aware fill)    | planned |
@@ -353,6 +353,66 @@ documents instead of real text corpora, a from-scratch regex engine
 over the documented subset instead of Python's `re` module, and a
 from-scratch Markdown converter instead of a Python markdown library.
 
+## Workload 8 — Asset Compression (implemented)
+
+Geekbench 6's Asset Compression workload pushes 16 texture and geometry
+assets through compression codecs — ASTC, BC7, DXTC for textures and
+Draco for meshes. LotofBench v0.11 reproduces the shape dependency-free
+with the DXTC family plus a Draco-style geometry codec:
+
+- **Assets**: 16 seeded assets — 8 opaque 256x256 textures (four
+  archetype families cycling: banded gradient, 8x8 flat-color mosaic,
+  concentric rings, two-tone checker with a diagonal ramp, all with
+  per-pixel noise), 4 alpha 256x256 textures (the same families with
+  seeded disks and a blocky checker in the alpha channel, the stand-in
+  for a sprite sheet) and 4 seeded triangle-strip meshes (3-6 strips of
+  16-64 triangles, affine vertex rows — the layout a strip-ordered mesh
+  gives a geometry codec). Fixed `--seed` means byte-identical assets
+  on every machine; generation is off the clock.
+- **Texture codecs (BC1 / BC3, the DXTC family)**: a from-scratch
+  block compressor and decoder — 4x4 color blocks, 5-6-5 endpoint
+  words, the 4-color palette with round-half-up 1/3 and 2/3
+  interpolants. The encoder evaluates bounding-box endpoints at two
+  effort levels: `AC_EFFORT_FAST` (raw box) and `AC_EFFORT_HIGH` (three
+  additional inset variants, quarter steps of the channel range), first
+  candidate winning ties; flat blocks get a +1 endpoint bump so the
+  stored color0 word is always greater than color1 (4-color mode).
+  Opaque textures run BC1 at both efforts; alpha textures run BC3 (the
+  8-byte alpha block with exact min/max endpoints, nearest-of-8 search,
+  +1 bump for the 8-interpolant mode, plus a FAST color block). The
+  decoder implements the full DXTC rules, including the 3-color
+  transparent mode (stored color0 <= color1, index 3 decodes alpha 0)
+  that the encoder never emits.
+- **Geometry codec (the Draco stand-in)**: positions quantized per
+  component to 12 bits over the per-component range (round half up),
+  then a stream of zigzag-encoded LEB128 varints — vertex 0 raw,
+  vertices 1-2 as deltas vs the previous vertex, later vertices against
+  a parallelogram prediction (the previous three vertices), which a
+  strip-ordered mesh makes near-exact; the index list is a zigzag
+  varint delta chain. The codec is lossless at the quantized level for
+  ANY indexed mesh — foreign vertex and triangle orders only enlarge
+  residuals (the unit tests prove it on reversed and shuffled orders).
+- **Verification**: every timed cycle re-encodes and decodes every
+  asset of the pass, and each result is checked against the
+  prepare-time references — the SHA-1 of the encoded stream, the SHA-1
+  of the decoded artifact (RGBA image, or the decoded quantized
+  positions and index list for meshes), and the total squared RGB error
+  of the decode vs the source (0 for meshes, whose round-trip is
+  exact). Any drift aborts the run instead of scoring.
+- **Cycle**: one run = the whole asset set (2 codec passes per opaque
+  texture, 1 per alpha texture and mesh), timed as a whole with
+  `CLOCK_MONOTONIC`. The multi-core pass runs 64 asset instances (4x
+  the set) split across threads.
+
+Known v0.11 divergences from Geekbench 6, all deliberate: the DXTC
+family instead of ASTC/BC7 (BC1/BC3 are the simplest fixed-func block
+codecs to implement dependency-free and bit-identically), a documented
+quantize + parallelogram + zigzag + varint geometry codec instead of
+Draco's full mesh-processing pipeline, 256x256 textures instead of
+GB6's assorted sizes, and synthetic seeded assets instead of real
+texture/mesh files — the throughput metric (asset bytes per second) is
+unaffected because the byte count is exact and machine-independent.
+
 ## Workload 12 — Horizon Detection (implemented)
 
 Geekbench 6's Horizon Detection workload finds the horizon line in a
@@ -528,6 +588,14 @@ Each run reports a **throughput**, and the workload result is the
   9× the corpus size, exact and deterministic (same seed, same
   count), so it is the text-processing analogue of the corpus size.
   On the default seed the suite processes 13,317,768 bytes per pass.
+- **Asset Compression** — asset bytes pushed through the codecs
+  divided by the wall-clock seconds of the full asset set, in decimal
+  megabytes per second (1 MB = 1,000,000 bytes). Each asset counts its
+  exact input bytes: w*h*3 per BC1 pass (2 passes for opaque
+  textures), w*h*4 for BC3, vertex_count*12 + index_count*4 for
+  meshes — exact and deterministic (same seed, same count), so it is
+  the asset-compression analogue of the corpus size. On the default
+  seed the suite pushes 4,213,816 bytes per pass.
 - **Horizon Detection** — input pixels detected divided by the
   wall-clock seconds of the full photo set, in millions of pixels per
   second (Mpixel/s). Each photo contributes its exact 1600×1200 frame
@@ -557,7 +625,7 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with nine
+will adopt the same aggregation once more workloads exist; with eleven
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
@@ -580,6 +648,9 @@ publishes its own score.
 - `BASELINE_TEXTPROCESSING_MBPS` = **200.0 MB/s** = 1000 (workload #7)
   — the reference machine processes about 200 million text bytes per
   second (8 regex scans + one Markdown conversion per document).
+- `BASELINE_ASSETCOMPRESSION_MBPS` = **50.0 MB/s** = 1000 (workload #8)
+  — the reference machine pushes about 50 million asset bytes per
+  second (the 16-asset set in about 93 ms single-core).
 - `BASELINE_HORIZONDETECTION_MPIXELS` = **50.0 Mpixel/s** = 1000
   (workload #12) — the reference machine runs the full grayscale →
   blur → Sobel → NMS → hysteresis → Hough chain over about 50 million
@@ -616,6 +687,11 @@ LotofBench does the same for every workload:
   contiguous slices, one per thread; each thread scans its documents'
   8 patterns, converts them Markdown→HTML and verifies both against
   the references.
+- **Asset Compression** — the multi-core pass runs 64 asset instances
+  (4x the single-core set) split into equal contiguous slices, one per
+  thread; each thread runs every codec pass of its assets (BC1 fast +
+  high, BC3, geometry) and verifies the results against the
+  references.
 - **Horizon Detection** — the multi-core pass detects 32 photos (4x
   the single-core set) split into equal contiguous slices, one per
   thread; each thread runs the full Canny + Hough chain on its photos

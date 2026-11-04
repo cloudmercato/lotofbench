@@ -8,11 +8,12 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 10 of 16
+## Status — workload 11 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
-**Photo Library**, **Clang**, **Text Processing**, **Horizon Detection**,
-**Photo Filter** and **Ray Tracer** are implemented (ten of the
+**Photo Library**, **Clang**, **Text Processing**, **Asset
+Compression**, **Horizon Detection**, **Photo Filter** and **Ray
+Tracer** are implemented (eleven of the
 Geekbench 6 CPU workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
@@ -50,6 +51,13 @@ workload list, the roadmap and the suggested landing order live in
   from-scratch backtracking engine, convert every document to HTML
   with a from-scratch Markdown converter, verify every match count
   and every HTML digest, score the bytes-processed rate.
+- **Asset Compression** — push 16 seeded assets (eight opaque 256x256
+  textures, four alpha textures, four triangle-strip meshes) through
+  from-scratch BC1 (DXT1) block codecs at two encoder efforts, BC3
+  (DXT5) for the alpha textures and a Draco-style quantize +
+  parallelogram + zigzag + varint geometry codec, verify every
+  encoded-stream digest, every decoded artifact and the exact encode
+  error, score the asset-bytes rate.
 - **Horizon Detection** — detect the horizon in eight seeded synthetic
   photos (six archetype families, 1600×1200 px, planted ground-truth
   boundary) through the full Canny chain — grayscale, separable
@@ -91,98 +99,107 @@ map is the map, the pages are the pages) that vary only with `--seed`.
 Real output on the development box (12 threads, defaults):
 
 ```
-LotofBench 0.10.0
+LotofBench 0.11.0
 seed 1, 5 runs, median
 
 File Compression (corpus 100 MB synthetic)
 Single-Core
-  throughput      107.9 MB/s
-  score             432   (baseline 250.0 MB/s = 1000)
+  throughput      107.8 MB/s
+  score             431   (baseline 250.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      604.9 MB/s
-  score            2419
+  throughput      608.0 MB/s
+  score            2432
 
 Navigation (grid 512x512, 64 routes)
 Single-Core
-  throughput       43.5 Medge/s
-  score             435   (baseline 100.0 Medge/s = 1000)
+  throughput       43.6 Medge/s
+  score             436   (baseline 100.0 Medge/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      219.5 Medge/s
-  score            2195
+  throughput      233.7 Medge/s
+  score            2337
 
 HTML5 Browser (32 pages, 800x600 viewport, 3544 DOM elements)
 Single-Core
-  throughput      291.8 pages/s
-  score             449   (baseline 650.0 pages/s = 1000)
+  throughput      302.4 pages/s
+  score             465   (baseline 650.0 pages/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput     1772.0 pages/s
-  score            2726
+  throughput     2352.0 pages/s
+  score            3618
 
 PDF Render (4 park maps, 2 pages each, 1224x1584 px @2x)
 Single-Core
   throughput        3.1 Mpixel/s
-  score             311   (baseline 10.0 Mpixel/s = 1000)
+  score             308   (baseline 10.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput       14.1 Mpixel/s
-  score            1411
+  throughput       13.9 Mpixel/s
+  score            1391
 
 Photo Library (16 photos, 1280x960 px, 8 classes)
 Single-Core
-  throughput      195.6 img/s
-  score             978   (baseline 200.0 img/s = 1000)
+  throughput      193.1 img/s
+  score             966   (baseline 200.0 img/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      895.4 img/s
-  score            4477
+  throughput      949.8 img/s
+  score            4749
 
 Clang (32 units, 986328 source tokens)
 Single-Core
-  throughput     4786.3 Ktokens/s
-  score             563   (baseline 8500.0 Ktokens/s = 1000)
+  throughput     4728.5 Ktokens/s
+  score             556   (baseline 8500.0 Ktokens/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput    23641.5 Ktokens/s
-  score            2781
+  throughput    23312.5 Ktokens/s
+  score            2743
 
 Text Processing (32 docs, 8 patterns/doc)
 Single-Core
-  throughput       96.2 MB/s
-  score             481   (baseline 200.0 MB/s = 1000)
+  throughput       97.3 MB/s
+  score             487   (baseline 200.0 MB/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      439.9 MB/s
-  score            2200
+  throughput      288.9 MB/s
+  score            1445
+
+Asset Compression (16 assets (12 textures, 4 meshes))
+Single-Core
+  throughput       46.5 MB/s
+  score             930   (baseline 50.0 MB/s = 1000)
+
+Multi-Core (12 threads, shared task)
+  throughput      212.4 MB/s
+  score            4248
 
 Horizon Detection (8 photos, 1600x1200 px, 6 archetypes, Canny+Hough)
 Single-Core
-  throughput       49.7 Mpixel/s
-  score             995   (baseline 50.0 Mpixel/s = 1000)
+  throughput       50.2 Mpixel/s
+  score            1004   (baseline 50.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      267.1 Mpixel/s
-  score            5341
+  throughput      292.4 Mpixel/s
+  score            5848
 
 Photo Filter (10 photos, 1600x1200 px, 6 archetypes)
 Single-Core
-  throughput       28.1 Mpixel/s
-  score             562   (baseline 50.0 Mpixel/s = 1000)
+  throughput       28.5 Mpixel/s
+  score             570   (baseline 50.0 Mpixel/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput      145.3 Mpixel/s
-  score            2907
+  throughput      151.2 Mpixel/s
+  score            3023
 
 Ray Tracer (8 views, 480x360 px, 984 triangles, Whitted)
 Single-Core
-  throughput        5.2 Mray/s
-  score            1037   (baseline 5.0 Mray/s = 1000)
+  throughput        5.1 Mray/s
+  score            1026   (baseline 5.0 Mray/s = 1000)
 
 Multi-Core (12 threads, shared task)
-  throughput       27.0 Mray/s
-  score            5405
+  throughput       26.9 Mray/s
+  score            5385
 ```
 
 ## What it measures
@@ -313,6 +330,24 @@ Multi-Core (12 threads, shared task)
   and the store's count and per-field queries must hold; any mismatch
   aborts instead of scoring.
 
+### Asset Compression
+
+- **Metric** — asset bytes pushed through the codecs per second
+  (MB/s): every run re-encodes and decodes the whole 16-asset set
+  (BC1 fast + high per opaque texture, BC3 per alpha texture, the
+  geometry codec per mesh), and the throughput is the exact input-byte
+  count divided by the wall-clock time, median over the runs. The byte
+  count is exact and machine-independent, like the corpus size for
+  File Compression.
+- **Score** — `round(throughput / baseline × 1000)`; the baseline
+  (50.0 MB/s = 1000, i.e. the 16-asset set in about 93 ms) is defined
+  in `src/lotofbench.h`.
+- **Correctness** — every codec pass is verified inside the timed
+  cycle: the encoded stream must SHA-1-match its prepare-time
+  reference, the decoded artifact must too, and the total squared RGB
+  error of the decode must reproduce the pinned value (mesh round-trips
+  are exact); any drift aborts instead of scoring.
+
 ## Tests
 
 ```sh
@@ -320,7 +355,7 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 107 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 118 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
@@ -347,6 +382,9 @@ src/workload_photolibrary.[ch]  workload #5 — photo corpus, thumbnail ladder,
                                 conv + auto-tag, record store
 src/workload_clang.[ch]       workload #6 — units, lexer, parser, codegen
 src/workload_textprocessing.[ch] workload #7 — corpus, regex, Markdown→HTML
+src/workload_assetcompression.[ch]
+                              workload #8 — asset corpus, BC1/BC3 codecs,
+                              geometry codec, verification
 src/workload_horizon.[ch]    workload #12 — photo corpus, Canny + Hough
 src/workload_raytracer.[ch]  workload #15 — showroom, BVH, Whitted tracer
 src/itrig.[ch]               shared integer trig table (0.25-degree bins)
