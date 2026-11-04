@@ -196,6 +196,12 @@ void test_pl_seed_variation(void)
                      PL_FEATURE_DIMS * sizeof(uint16_t)) == 0);
     pl_free(a);
     pl_free(b);
+    /* regression (issue #11): seed 15's first draws pushed photo 7
+     * across a centroid boundary — the corpus must still verify via
+     * the deterministic redraw */
+    a = pl_prepare(15);
+    CHECK(a != NULL);
+    pl_free(a);
 }
 
 void test_pl_run_sane(void)

@@ -77,6 +77,13 @@ list and implementation status live in
   (`sfm_essential_ransac`, `sfm_decompose_essential`,
   `sfm_triangulate_midpoint`, `sfm_essential_from_pose`)
   differentially tested against the planted geometry.
+- **v0.12.1** — Photo Library corpus robustness fix: a seeded photo
+  whose big accent shapes carried it across a nearest-centroid
+  boundary (e.g. seed 15, photo 7) aborted the whole run at prepare
+  time; the photo is now redrawn deterministically from the same
+  stream until the classifier recovers the planted class, so every
+  seed yields a valid corpus (seeds 1-40 verified, seed-1 digests
+  unchanged).
 
 ## Suggested landing order
 
