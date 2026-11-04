@@ -123,12 +123,31 @@ list and implementation status live in
   and is checked to the bit) and the kernel units for the weights,
   the normalization, the downsample and the expand.
 
+- **v0.16** — Workload #11 Object Remover (four seeded 1600x1200
+  photos — beach, forest, city, studio — each planting a two-shape
+  lasso mask (a disc radius 64..96 plus an overlapping rectangle, 48
+  px inside the frame) whose hidden bytes are never read, through a
+  100%-integer push-pull pyramid inpainting: coarse cells are the
+  half-up mean of their distinct known children, the coarsest plane
+  takes the known-mean fallback (a degeneracy-guarded non-zero count —
+  every disc covers a fully-masked 64x64 block), then coarse to fine a
+  bilinear pull plus 24 in-place Gauss-Seidel Laplace sweeps per level
+  over the unknown cells only, known cells fixed (Dirichlet); every
+  timed cycle verifies the SHA-1 of the mask and of the filled frame
+  plus three exact counters against prepare-time references, Mpixel/s
+  metric) + 14 tests including the constant-photo closed-form fill
+  (the harmonic fill of a constant boundary is the constant, to the
+  byte) and a differential of the whole pipeline against an
+  independently written naive fill.
+
 ## Suggested landing order
 
 1. ~~#9 Object Detection~~ — **landed in v0.13**.
 2. ~~#10 Background Blur~~ — **landed in v0.14**.
-3. ~~#14 HDR~~ — **landed in v0.15**; next in line:
-4. **#11 Object Remover** — iterative Laplacian/pyramid inpainting.
+3. ~~#14 HDR~~ — **landed in v0.15**.
+4. ~~#11 Object Remover~~ — **landed in v0.16**; all 16 Geekbench 6
+   CPU workloads are now implemented. Next up per Cross-cutting: the
+   composite scoring once its gating conditions are met (they now are).
 
 ## The remaining Geekbench 6 CPU workloads
 
@@ -153,7 +172,7 @@ the same grouping once it aggregates (see Composite scoring).
 |---|----------|------------------|---------------------|
 | 9 | Object Detection | MobileNet v1 SSD over photos | Fixed deterministic quantized (int8) conv net over synthetic images; metric images/s; verify output tensor hash — **implemented v0.13** |
 | 10 | Background Blur | DeepLabV3+ segmentation on video | Simplified segmentation mask + per-pixel blur strength over synthetic frames; metric fps — **implemented v0.14** |
-| 11 | Object Remover | Inpainting (content-aware fill) | Iterative Laplacian/pyramid fill over synthetic masks; metric Mpixels/s |
+| 11 | Object Remover | Inpainting (content-aware fill) | Push-pull pyramid fill over synthetic masks; metric Mpixels/s; verify the filled-frame hash — **implemented v0.16** |
 | 12 | Horizon Detection | Canny edges + Hough transform | From-scratch Canny + Hough over synthetic images with known horizons; metric Mpixels/s; verify detected line parameters against ground truth — **implemented v0.8** |
 | 13 | Photo Filter | Color/blur filters, crop, scale | Gaussian/box blur, saturation, crop+scale pipelines over synthetic images; metric Mpixels/s — **implemented v0.7** |
 | 14 | HDR | Blending six 16 MP SDR photos | Simplified exposure-fusion (pyramid blend) over six synthetic exposures; metric Mpixels/s — **implemented v0.15** |

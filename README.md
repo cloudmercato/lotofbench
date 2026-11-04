@@ -8,14 +8,14 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 15 of 16
+## Status — workload 16 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
 **Photo Library**, **Clang**, **Text Processing**, **Asset
 Compression**, **Object Detection**, **Background Blur**, **Horizon
-Detection**, **Photo Filter**, **HDR**, **Ray Tracer** and **Structure
-from Motion** are implemented (fifteen of the Geekbench
-6 CPU workloads). The full
+Detection**, **Photo Filter**, **HDR**, **Ray Tracer**, **Structure
+from Motion** and **Object Remover** are implemented (sixteen of the
+Geekbench 6 CPU workloads — all of them). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
 [ROADMAP.md](ROADMAP.md).
@@ -104,6 +104,15 @@ workload list, the roadmap and the suggested landing order live in
   cheirality pose selection and midpoint triangulation — verify the
   digest, the exact inlier split, the planted pose and sub-pixel
   reprojection, score the pairs-per-second rate.
+- **Object Remover** — erase a two-shape lasso mask (a disc plus an
+  overlapping rectangle) from four seeded synthetic 1600×1200 photos
+  (beach, forest, city, studio) with a 100%-integer push-pull pyramid
+  inpainting — coarse cells are the half-up mean of their known
+  children, the coarsest plane takes the known-mean fallback, then
+  coarse to fine a bilinear pull plus Gauss-Seidel Laplace sweeps over
+  the unknown cells only — the hidden bytes are never read; verify
+  every mask and filled-frame digest plus the exact counters, score
+  the megapixel rate.
 
 ## Build (one command)
 
@@ -428,7 +437,9 @@ Dijkstra on every route, plus a differential test of HTML5 Browser's
 rasterizer against an independent brute-force compositor that
 re-derives every pixel from the display list, plus HDR's constant-plane
 closed-form fusion (the fused value reduces to the documented weight
-math and is checked to the bit). The suite is kept clean
+math and is checked to the bit) and Object Remover's whole-pipeline
+differential against an independently written naive fill. The suite is
+kept clean
 under `-fsanitize=address,undefined`; golden values are regenerated
 with `tools/gen_goldens.c` after deliberate format changes only.
 
@@ -463,6 +474,9 @@ src/itrig.[ch]               shared integer trig table (0.25-degree bins)
 src/workload_photofilter.[ch] workload #13 — photo corpus, filter cycles
 src/workload_hdr.[ch]         workload #14 — scene corpus, exposure burst,
                               Mertens exposure-fusion pipeline
+src/workload_objectremover.[ch]
+                              workload #11 — photo corpus, lasso masks,
+                              push-pull pyramid inpainting
 src/imgops.[ch]               shared integer image kernels (blur, levels,
                               grayscale, Gaussian blur, color matrix,
                               crop, bilinear scale, box downscale)
