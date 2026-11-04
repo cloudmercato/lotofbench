@@ -8,13 +8,15 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.12.1"
+#define LOTOFBENCH_VERSION   "0.13.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
 #define FC_WORKLOAD_SLUG     "file-compression"
 #define NAV_WORKLOAD_NAME    "Navigation"
 #define NAV_WORKLOAD_SLUG    "navigation"
+#define OD_WORKLOAD_NAME     "Object Detection"
+#define OD_WORKLOAD_SLUG     "object-detection"
 #define HTML5_WORKLOAD_NAME  "HTML5 Browser"
 #define HTML5_WORKLOAD_SLUG  "html5-browser"
 #define PDF_WORKLOAD_NAME    "PDF Render"
@@ -58,6 +60,13 @@
  * The 1000-point reference machine relaxes 100.0 million edges per
  * second — one edge per nanosecond, a round and honest yardstick. */
 #define BASELINE_NAVIGATION_MEDGES    100.0
+
+/* Workload #9 — Object Detection: photos inferred per second (each one
+ * through the fixed quantized conv net + detection decode). The
+ * 1000-point reference machine infers 25.0 photos per second (a full
+ * 300x300 photo through the 12-layer net in about 40 ms, scalar
+ * plain-C speed) — a round and honest yardstick. */
+#define BASELINE_OBJDETECTION_IPS     25.0
 
 /* Workload #3 — HTML5 Browser: pages rendered per second (parse +
  * layout + raster of one 800x600 page). The 1000-point reference

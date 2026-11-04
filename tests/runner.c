@@ -162,6 +162,22 @@ static const test_entry TESTS[] = {
     { "sfm/run-sane", test_sfm_run_sane },
     { "sfm/thread-clamp", test_sfm_thread_clamp },
     { "sfm/null-accessors", test_sfm_accessors_null_safe },
+    /* workload #9 — object detection */
+    { "objectdetection/photos-deterministic",
+      test_od_photos_deterministic },
+    { "objectdetection/input-invariants", test_od_input_invariants },
+    { "objectdetection/seed-variation", test_od_seed_variation },
+    { "objectdetection/net-seed-independent",
+      test_od_net_seed_independent },
+    { "objectdetection/quantize-units", test_od_quantize_units },
+    { "objectdetection/conv-units", test_od_conv_units },
+    { "objectdetection/anchor-units", test_od_anchor_units },
+    { "objectdetection/decode-units", test_od_decode_units },
+    { "objectdetection/differential-naive", test_od_differential_naive },
+    { "objectdetection/corpus-golden", test_od_corpus_golden },
+    { "objectdetection/run-sane", test_od_run_sane },
+    { "objectdetection/thread-clamp", test_od_thread_clamp },
+    { "objectdetection/null-accessors", test_od_accessors_null_safe },
 };
 
 int main(void)

@@ -215,4 +215,19 @@ void test_sfm_run_sane(void);
 void test_sfm_thread_clamp(void);
 void test_sfm_accessors_null_safe(void);
 
+/* --- workload #9: object detection ---------------------------------------------------*/
+void test_od_photos_deterministic(void);
+void test_od_input_invariants(void);
+void test_od_seed_variation(void);
+void test_od_net_seed_independent(void);
+void test_od_quantize_units(void);
+void test_od_conv_units(void);
+void test_od_anchor_units(void);
+void test_od_decode_units(void);
+void test_od_differential_naive(void);
+void test_od_corpus_golden(void);
+void test_od_run_sane(void);
+void test_od_thread_clamp(void);
+void test_od_accessors_null_safe(void);
+
 #endif /* LOTOFBENCH_TESTS_H */
