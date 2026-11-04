@@ -20,6 +20,7 @@
 #include "workload_textprocessing.h"
 #include "workload_photofilter.h"
 #include "workload_raytracer.h"
+#include "workload_sfm.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -205,6 +206,18 @@ static int run_rt(rt_ctx *rt, unsigned runs, unsigned threads_req,
     return 0;
 }
 
+static int run_sfm(sfm_ctx *sfm, unsigned runs, unsigned threads_req,
+                   lb_result *out, uint64_t *pairs)
+{
+    unsigned t = threads_req;
+
+    if (sfm_run(sfm, runs, &t, &out->throughput, pairs) != 0)
+        return -1;
+    out->threads = t;
+    out->score = lb_score(out->throughput, BASELINE_SFM_PAIRS);
+    return 0;
+}
+
 /* --- output ------------------------------------------------------------------*/
 
 static void print_block(const char *unit, double baseline,
@@ -240,7 +253,9 @@ static void print_json(const options *opt, const lb_result *fc_single,
                        const lb_result *pf_multi, uint64_t pf_pixels,
                        const lb_result *rt_single,
                        const lb_result *rt_multi, uint64_t rt_rays,
-                       unsigned rt_triangles)
+                       unsigned rt_triangles,
+                       const lb_result *sfm_single,
+                       const lb_result *sfm_multi, uint64_t sfm_pairs)
 {
     printf("{\n");
     printf("  \"benchmark\": \"lotofbench\",\n");
@@ -350,8 +365,20 @@ static void print_json(const options *opt, const lb_result *fc_single,
            "\"score\": %ld},\n",
            rt_single->threads, rt_single->throughput, rt_single->score);
     printf("     \"multi\": {\"threads\": %u, \"throughput_mrays\": %.1f, "
-           "\"score\": %ld}}\n",
+           "\"score\": %ld}},\n",
            rt_multi->threads, rt_multi->throughput, rt_multi->score);
+    printf("    {\"name\": \"%s\", \"pairs\": %u, \"view\": \"%ux%u\", "
+           "\"scene_points\": %u, \"task_pairs\": %llu, "
+           "\"baseline_pairs\": %.1f,\n",
+           SFM_WORKLOAD_SLUG, SFM_PAIRS, SFM_VIEW_W, SFM_VIEW_H,
+           SFM_SCENE_POINTS, (unsigned long long)sfm_pairs,
+           BASELINE_SFM_PAIRS);
+    printf("     \"single\": {\"threads\": %u, \"throughput_pairs\": %.1f, "
+           "\"score\": %ld},\n",
+           sfm_single->threads, sfm_single->throughput, sfm_single->score);
+    printf("     \"multi\": {\"threads\": %u, \"throughput_pairs\": %.1f, "
+           "\"score\": %ld}}\n",
+           sfm_multi->threads, sfm_multi->throughput, sfm_multi->score);
     printf("  ]\n");
     printf("}\n");
 }
@@ -369,9 +396,10 @@ int main(int argc, char **argv)
     hd_ctx *hd = hd_prepare(opt.seed);
     pf_ctx *pf = pf_prepare(opt.seed);
     rt_ctx *rt = rt_prepare(opt.seed);
+    sfm_ctx *sfm = sfm_prepare(opt.seed);
 
     if (!fc || !nav || !h5 || !pdf || !pl || !cl || !tp || !hd ||
-        !pf || !rt) {
+        !pf || !rt || !sfm) {
         fprintf(stderr,
                 "lotofbench: out of memory building the workload inputs\n");
         fc_free(fc);
@@ -384,6 +412,7 @@ int main(int argc, char **argv)
         hd_free(hd);
         pf_free(pf);
         rt_free(rt);
+        sfm_free(sfm);
         return 1;
     }
 
@@ -397,9 +426,10 @@ int main(int argc, char **argv)
     lb_result hd_single = { 0, 0.0, 0 }, hd_multi = { 0, 0.0, 0 };
     lb_result pf_single = { 0, 0.0, 0 }, pf_multi = { 0, 0.0, 0 };
     lb_result rt_single = { 0, 0.0, 0 }, rt_multi = { 0, 0.0, 0 };
+    lb_result sfm_single = { 0, 0.0, 0 }, sfm_multi = { 0, 0.0, 0 };
     uint64_t nav_ops = 0, h5_pages = 0, pdf_pixels = 0, pl_photos = 0,
              cl_tokens = 0, tp_bytes = 0, hd_pixels = 0, pf_pixels = 0,
-             rt_rays = 0;
+             rt_rays = 0, sfm_pairs = 0;
 
     if (run_fc(fc, opt.runs, 1, &fc_single) != 0 ||
         run_fc(fc, opt.runs, opt.threads, &fc_multi) != 0 ||
@@ -420,7 +450,9 @@ int main(int argc, char **argv)
         run_pf(pf, opt.runs, 1, &pf_single, &pf_pixels) != 0 ||
         run_pf(pf, opt.runs, opt.threads, &pf_multi, &pf_pixels) != 0 ||
         run_rt(rt, opt.runs, 1, &rt_single, &rt_rays) != 0 ||
-        run_rt(rt, opt.runs, opt.threads, &rt_multi, &rt_rays) != 0) {
+        run_rt(rt, opt.runs, opt.threads, &rt_multi, &rt_rays) != 0 ||
+        run_sfm(sfm, opt.runs, 1, &sfm_single, &sfm_pairs) != 0 ||
+        run_sfm(sfm, opt.runs, opt.threads, &sfm_multi, &sfm_pairs) != 0) {
         fprintf(stderr,
                 "lotofbench: workload failed — a result did not verify\n");
         fc_free(fc);
@@ -433,6 +465,7 @@ int main(int argc, char **argv)
         hd_free(hd);
         pf_free(pf);
         rt_free(rt);
+        sfm_free(sfm);
         return 1;
     }
 
@@ -445,10 +478,12 @@ int main(int argc, char **argv)
                    &tp_single, &tp_multi, tp_bytes, &hd_single, &hd_multi,
                    hd_pixels, &pf_single, &pf_multi, pf_pixels,
                    &rt_single, &rt_multi, rt_rays,
-                   (unsigned)rt_tri_count(rt));
+                   (unsigned)rt_tri_count(rt), &sfm_single, &sfm_multi,
+                   sfm_pairs);
     } else {
         char fc_cfg[64], nav_cfg[64], h5_cfg[64], pdf_cfg[96], pl_cfg[96],
-             cl_cfg[64], tp_cfg[64], hd_cfg[96], pf_cfg[96], rt_cfg[96];
+             cl_cfg[64], tp_cfg[64], hd_cfg[96], pf_cfg[96], rt_cfg[96],
+             sfm_cfg[96];
 
         snprintf(fc_cfg, sizeof(fc_cfg), "corpus %u MB synthetic",
                  opt.corpus_mb);
@@ -477,6 +512,9 @@ int main(int argc, char **argv)
                  "%u views, %ux%u px, %u triangles, Whitted",
                  RT_VIEWS, RT_VIEW_W, RT_VIEW_H,
                  (unsigned)rt_tri_count(rt));
+        snprintf(sfm_cfg, sizeof(sfm_cfg),
+                 "%u pairs, %ux%u px, %u scene points, FAST+RANSAC",
+                 SFM_PAIRS, SFM_VIEW_W, SFM_VIEW_H, SFM_SCENE_POINTS);
 
         printf("LotofBench %s\n", LOTOFBENCH_VERSION);
         printf("seed %u, %u runs, median\n\n", opt.seed, opt.runs);
@@ -511,6 +549,8 @@ int main(int argc, char **argv)
         printf("\n%s (%s)\n", RT_WORKLOAD_NAME, rt_cfg);
         print_block("Mray/s", BASELINE_RAYTRACER_MRAYS, &rt_single,
                     &rt_multi);
+        printf("\n%s (%s)\n", SFM_WORKLOAD_NAME, sfm_cfg);
+        print_block("pairs/s", BASELINE_SFM_PAIRS, &sfm_single, &sfm_multi);
     }
 
     fc_free(fc);
@@ -523,5 +563,6 @@ int main(int argc, char **argv)
     hd_free(hd);
     pf_free(pf);
     rt_free(rt);
+    sfm_free(sfm);
     return 0;
 }

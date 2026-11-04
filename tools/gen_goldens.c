@@ -29,6 +29,7 @@
 #include "workload_photolibrary.h"
 #include "workload_raytracer.h"
 #include "workload_pdfrender.h"
+#include "workload_sfm.h"
 #include "workload_textprocessing.h"
 
 #include <stdio.h>
@@ -282,5 +283,40 @@ int main(void)
     printf("\nRT_SEED1_TASK_PIXELS_MULTI %llu",
            (unsigned long long)rt_task_pixels(1));
     rt_free(rt);
+
+    /* structure from motion: seed-1 pair 0 reference (reconstruction
+     * digest + exact counters), the left view 0 frame digest, the
+     * per-pair visible counts and the task pair counts */
+    {
+        sfm_ctx *sfm = sfm_prepare(1);
+
+        if (!sfm)
+            return 1;
+        {
+            const sfm_result *r = sfm_reference(sfm, 0);
+
+            printf("\nSFM_SEED1_PAIR0_REF");
+            for (int i = 0; i < 20; i++)
+                printf(" %02x", r->digest[i]);
+            printf("\nSFM_SEED1_PAIR0_COUNTS corners=%u/%u inliers=%u "
+                   "tri=%u",
+                   r->corners_left, r->corners_right, r->inliers,
+                   r->triangulated);
+        }
+        {
+            const uint8_t *v = sfm_view(sfm, 0, 0);
+
+            sha1_hex(v, (size_t)SFM_VIEW_W * SFM_VIEW_H, hex);
+            printf("\nSFM_SEED1_VIEW0_SHA1 %s", hex);
+        }
+        printf("\nSFM_SEED1_VISIBLE");
+        for (unsigned p = 0; p < SFM_PAIRS; p++)
+            printf(" %u", sfm_visible(sfm, p));
+        printf("\nSFM_SEED1_TASK_PAIRS %llu",
+               (unsigned long long)sfm_task_pairs(0));
+        printf("\nSFM_SEED1_TASK_PAIRS_MULTI %llu",
+               (unsigned long long)sfm_task_pairs(1));
+        sfm_free(sfm);
+    }
     return 0;
 }

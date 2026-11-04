@@ -26,6 +26,7 @@ SRC = src/main.c \
       src/itrig.c \
       src/workload_horizon.c \
       src/workload_raytracer.c \
+      src/workload_sfm.c \
       src/imgops.c \
       src/lz4.c \
       src/sha1.c
@@ -45,6 +46,7 @@ HDR = src/lotofbench.h \
       src/itrig.h \
       src/workload_horizon.h \
       src/workload_raytracer.h \
+      src/workload_sfm.h \
       src/imgops.h \
       src/lz4.h \
       src/sha1.h
@@ -65,7 +67,8 @@ TESTS_SRC = tests/runner.c \
             tests/test_imgops.c \
             tests/test_workload_photofilter.c \
             tests/test_workload_horizon.c \
-            tests/test_workload_raytracer.c
+            tests/test_workload_raytracer.c \
+            tests/test_workload_sfm.c
 TESTS_HDR = tests/tests.h
 # The test binary links everything but the suite driver (it has its own main).
 TESTS_LIB = $(filter-out src/main.c,$(SRC))

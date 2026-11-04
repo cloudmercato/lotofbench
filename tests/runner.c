@@ -134,6 +134,21 @@ static const test_entry TESTS[] = {
     { "photofilter/run-sane", test_pf_run_sane },
     { "photofilter/thread-clamp", test_pf_thread_clamp },
     { "photofilter/null-accessors", test_pf_accessors_null_safe },
+
+    { "sfm/scene-deterministic", test_sfm_scene_deterministic },
+    { "sfm/input-invariants", test_sfm_input_invariants },
+    { "sfm/reference-golden", test_sfm_reference_golden },
+    { "sfm/essential-estimator", test_sfm_essential_estimator },
+    { "sfm/fast9-synthetic", test_sfm_fast9_synthetic },
+    { "sfm/jacobi3-eigen", test_sfm_jacobi3_eigen },
+    { "sfm/jacobi9-nullvec", test_sfm_jacobi9_nullvec },
+    { "sfm/sampson-known", test_sfm_sampson_known },
+    { "sfm/decompose-pose", test_sfm_decompose_pose },
+    { "sfm/triangulate-known", test_sfm_triangulate_known },
+    { "sfm/seed-variation", test_sfm_seed_variation },
+    { "sfm/run-sane", test_sfm_run_sane },
+    { "sfm/thread-clamp", test_sfm_thread_clamp },
+    { "sfm/null-accessors", test_sfm_accessors_null_safe },
 };
 
 int main(void)

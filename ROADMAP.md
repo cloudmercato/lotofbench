@@ -59,6 +59,17 @@ list and implementation status live in
   in-memory record store with integrity queries — the SQLite
   stand-in; every thumbnail SHA-1-verified, img/s metric) + the shared
   `img_box_downscale` kernel in `src/imgops.c`.
+- **v0.11** — Workload #16 Structure from Motion (twelve seeded stereo
+  pairs of a 544-point synthetic room through the full SfM pipeline:
+  FAST-9 with ring-SAD non-max suppression, nearest-corner matching,
+  Hartley-normalized 8-point RANSAC over cyclic-Jacobi eigensolvers,
+  cheirality pose selection over the four (R, ±t) candidates, midpoint
+  triangulation; every reconstruction verified against the planted
+  pose, the exact inlier split, sub-pixel reprojection bounds and a
+  prepare-time SHA-1 digest, pairs/s metric) + the public low-level API
+  (`sfm_essential_ransac`, `sfm_decompose_essential`,
+  `sfm_triangulate_midpoint`, `sfm_essential_from_pose`)
+  differentially tested against the planted geometry.
 
 ## Suggested landing order
 
@@ -94,7 +105,7 @@ the same grouping once it aggregates (see Composite scoring).
 | 13 | Photo Filter | Color/blur filters, crop, scale | Gaussian/box blur, saturation, crop+scale pipelines over synthetic images; metric Mpixels/s — **implemented v0.7** |
 | 14 | HDR | Blending six 16 MP SDR photos | Simplified exposure-fusion (pyramid blend) over six synthetic exposures; metric Mpixels/s |
 | 15 | Ray Tracer | Blender BMW scene, Embree-style | Whitted-style tracer with a BVH over a deterministic synthetic scene; metric Mrays/s; verify pixel hash — **implemented v0.9** |
-| 16 | Structure from Motion | 3D geometry from 2D image pairs | Feature detection (FAST/Harris) + RANSAC essential matrix + triangulation over synthetic correspondences; verify reprojection error; metric pairs/s |
+| 16 | Structure from Motion | 3D geometry from 2D image pairs | FAST-9 detection + 8-point RANSAC essential + midpoint triangulation over synthetic stereo pairs; verify reprojection error and planted pose; metric pairs/s — **implemented v0.11** |
 
 ## Cross-cutting
 

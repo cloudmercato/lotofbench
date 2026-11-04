@@ -186,4 +186,20 @@ void test_pf_run_sane(void);
 void test_pf_thread_clamp(void);
 void test_pf_accessors_null_safe(void);
 
+/* --- workload #16: structure from motion ---------------------------------------------------*/
+void test_sfm_scene_deterministic(void);
+void test_sfm_input_invariants(void);
+void test_sfm_reference_golden(void);
+void test_sfm_essential_estimator(void);
+void test_sfm_fast9_synthetic(void);
+void test_sfm_jacobi3_eigen(void);
+void test_sfm_jacobi9_nullvec(void);
+void test_sfm_sampson_known(void);
+void test_sfm_decompose_pose(void);
+void test_sfm_triangulate_known(void);
+void test_sfm_seed_variation(void);
+void test_sfm_run_sane(void);
+void test_sfm_thread_clamp(void);
+void test_sfm_accessors_null_safe(void);
+
 #endif /* LOTOFBENCH_TESTS_H */
