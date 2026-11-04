@@ -28,7 +28,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 11| Object Remover                | Inpainting (content-aware fill)    | planned |
 | 12| Horizon Detection             | Canny edges + Hough transform      | **implemented v0.8** |
 | 13| Photo Filter                  | Color/blur filters, crop, scale    | **implemented v0.7** |
-| 14| HDR                           | Blending six 16 MP SDR photos      | planned |
+| 14| HDR                           | Blending six 16 MP SDR photos      | **implemented v0.15** |
 | 15| Ray Tracer                    | Blender BMW scene, Embree-style    | **implemented v0.9** |
 | 16| Structure from Motion         | 3D geometry from 2D image pairs    | **implemented v0.12** |
 
@@ -635,6 +635,68 @@ GB6's per-photo filter choices — the throughput metric (output pixels
 per second) is unaffected because the pixel count is exact and
 machine-independent.
 
+## Workload 14 — HDR (implemented)
+
+Geekbench 6's HDR workload fuses a bracketed burst of six 16 MP SDR
+photos into one HDR image with Mertens-style exposure fusion — the
+computational-photography pass. LotofBench v0.15 reproduces the shape
+dependency-free, 100% integer, with a seeded synthetic burst standing
+in for the real photos:
+
+- **Corpus**: four seeded 1600x1200 scenes in four archetype families
+  (backlit window, sunset, gallery, night street), each a 12-bit
+  radiance field — a two-stop vertical gradient plus planted analytic
+  elements (bright windows, a sun disc, spotlights with Chebyshev
+  falloff) and ±24/4096 per-pixel noise — mapped onto six exposures
+  one EV apart: byte = clamp((V·2^k·255 + 2048) >> 12) + noise for
+  k = 0..5. The bright stops clip the highlights, the dark stops drown
+  the shadows. Fixed `--seed` means byte-identical exposures on every
+  machine; generation is off the clock.
+- **Ground truth**: every scene plants one flat 192x192 highlight
+  patch and one flat 192x192 shadow patch (boxes and clean 12-bit
+  luminances exposed through accessors). The highlight bytes are
+  clipped in every stop from 1 on and read back at exposure 0; the
+  shadow bytes are near-black at exposure 0 and well-exposed by stop
+  4 — the fused output must recover both.
+- **The pipeline** (per scene, inside the timed section): per-exposure
+  Mertens weight maps in fixed point — contrast (the absolute
+  4-neighbour Laplacian of the Rec.601 luma, quartered half-up, floor
+  16, cap 256), saturation (max(R,G,B) − min(R,G,B), floor 16, cap
+  256) and well-exposedness (255·(1 − Σ(v−128)²/(3·128²)), half-up — a
+  linear decay from the midtone peak), combined as
+  W16 = (contrast·saturation·well) >> 8; per-pixel normalization
+  across the six exposures (floor division, the last exposure carries
+  the remainder, so the stack sums to exactly 255 everywhere; an
+  all-zero pixel takes the documented uniform 42×5+45 fallback); a
+  6-level Laplacian pyramid of every exposure and a 6-level Gaussian
+  pyramid of every normalized weight plane (2x2 half-up box
+  downsample, the shared img_scale_bilinear as the upsample); per-level
+  blending into int32 accumulators (one symmetric half-up division by
+  255 per pixel at collapse; the deepest level blends the Gaussian
+  residuals directly); and the collapse — bilinear expand of the
+  signed accumulator (16.16, half-up toward +infinity) plus the level
+  accumulator, clamped to bytes.
+- **Verification**: every timed cycle re-runs the full pipeline per
+  scene and checks the SHA-1 of the normalized weight stack and of the
+  fused frame against prepare-time references, plus three exact
+  counters (weight-starved pixels, output pixels clamped at 255, black
+  output pixels), with the degeneracy guards uniform == 0 and
+  lo_black == 0 (the scene floor keeps every pixel visible in the
+  longest exposure). Any drift aborts the run instead of scoring.
+- **Cycle**: one run = the four scenes through the full fusion, timed
+  as a whole with `CLOCK_MONOTONIC`, reported as millions of fused
+  output pixels per second. The multi-core pass fuses 16 scene
+  instances (4x the set) split across threads.
+
+Known v0.15 divergences from Geekbench 6, all deliberate: four
+1600x1200 synthetic scenes instead of one 16 MP burst (the pipeline
+shape is the workload), one fixed Mertens-style integer fusion instead
+of an unspecified production stack, and the shared imgops bilinear
+upsample standing in for a Gaussian pyramid expand. The throughput
+metric (millions of fused output pixels per second) is unaffected
+because the pipeline is 100% integer, bit-exact and
+machine-independent.
+
 ## Workload 15 — Ray Tracer (implemented)
 
 Geekbench 6's Ray Tracer workload renders the Blender Foundation's BMW
@@ -786,6 +848,11 @@ Each run reports a **throughput**, and the workload result is the
   (Mpixel/s). Each photo contributes its exact 1600×1200 output frame
   (19,200,000 pixels per single-core pass); the count is
   machine-independent, like the corpus size for File Compression.
+- **HDR** — fused output pixels divided by the wall-clock seconds of
+  the full scene set, in millions of pixels per second (Mpixel/s).
+  Each scene contributes its exact 1600×1200 fused frame (7,680,000
+  pixels per single-core pass); the count is machine-independent, like
+  the corpus size for File Compression.
 - **Ray Tracer** — traced rays divided by the wall-clock seconds of the
   full view set, in millions of rays per second (Mray/s). Every
   primary, shadow and reflection ray is counted exactly; the count is
@@ -811,7 +878,7 @@ numbers, and **LotofBench scores are not comparable with Geekbench
 scores**: Geekbench 6 calibrates its composite at 2500 (Core i7-12700
 reference) and folds its 16 workloads into Integer/Floating-Point
 subsections with geometric means, then weights them 65/35. LotofBench
-will adopt the same aggregation once more workloads exist; with eleven
+will adopt the same aggregation once more workloads exist; with fifteen
 workloads there is still nothing to aggregate, so each workload
 publishes its own score.
 
@@ -845,6 +912,11 @@ publishes its own score.
   #13) — the reference machine filters about 50 million output pixels
   per second (the five-stage stack over a 1600×1200 photo in about
   45 ms).
+- `BASELINE_HDR_MPIXELS` = **6.0 Mpixel/s** = 1000 (workload #14) —
+  the reference machine fuses about 6 million output pixels per second
+  (the full 4-scene set, six exposures each, in about 1.28 s
+  single-core; a round yardstick chosen next to the probe measurement
+  on the development box, taken under background load).
 - `BASELINE_RAYTRACER_MRAYS` = **5.0 Mray/s** = 1000 (workload #15) —
   the reference machine traces about 5 million rays per second through
   the BVH (the 8-view pass in about 1.1 s single-core).

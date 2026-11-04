@@ -8,13 +8,13 @@ relative score against a fixed baseline.
 **Not affiliated with Primate Labs.** LotofBench scores are its own
 calibration and are *not* comparable with Geekbench scores.
 
-## Status — workload 14 of 16
+## Status — workload 15 of 16
 
 **File Compression**, **Navigation**, **HTML5 Browser**, **PDF Render**,
 **Photo Library**, **Clang**, **Text Processing**, **Asset
 Compression**, **Object Detection**, **Background Blur**, **Horizon
-Detection**, **Photo Filter**, **Ray Tracer** and **Structure from
-Motion** are implemented (fourteen of the Geekbench
+Detection**, **Photo Filter**, **HDR**, **Ray Tracer** and **Structure
+from Motion** are implemented (fifteen of the Geekbench
 6 CPU workloads). The full
 workload list, the roadmap and the suggested landing order live in
 [docs/benchmarks.md](docs/benchmarks.md) and
@@ -83,6 +83,14 @@ workload list, the roadmap and the suggested landing order live in
   saturation, levels, two-pass box blur, central crop, bilinear
   rescale — built on shared integer image kernels, verify every
   filtered digest, score the megapixel rate.
+- **HDR** — fuse four seeded synthetic 1600×1200 scenes (backlit
+  window, sunset, gallery, night street), each a six-exposure bracket
+  1 EV apart whose bright stops clip the highlights and whose dark
+  stops drown the shadows, through a 100%-integer Mertens-style
+  exposure fusion — fixed-point weight maps, per-pixel normalization,
+  Laplacian/Gaussian pyramids, per-level blend, collapse — verify
+  every weight-stack and fused-frame digest plus the exact counters,
+  score the megapixel rate.
 - **Ray Tracer** — render eight seeded views of a synthetic showroom
   (checker floor, geodesic spheres, boxes and cylinders in chrome,
   paint and matte finishes, three point lights) with a Whitted tracer
@@ -213,6 +221,15 @@ Multi-Core (12 threads, shared task)
   throughput      151.2 Mpixel/s
   score            3023
 
+HDR (4 scenes x 6 exposures, 1600x1200 px, Mertens fusion)
+Single-Core
+  throughput        5.6 Mpixel/s
+  score             940   (baseline 6.0 Mpixel/s = 1000)
+
+Multi-Core (4 threads, shared task)
+  throughput       20.3 Mpixel/s
+  score            3387
+
 Ray Tracer (8 views, 480x360 px, 984 triangles, Whitted)
 Single-Core
   throughput        5.1 Mray/s
@@ -309,6 +326,23 @@ Multi-Core (4 threads, shared task)
   SHA-1 must match exactly; a broken pipeline aborts instead of
   scoring.
 
+### HDR
+
+- **Metric** — millions of fused output pixels per second (Mpixel/s):
+  every run fuses the whole four-scene set through the full
+  weight-map → pyramid → blend → collapse pipeline, and the throughput
+  is the exact fused-pixel count (four 1600×1200 frames) divided by
+  the wall-clock time, median over the runs. The pixel count is exact
+  and machine-independent, like the corpus size for File Compression.
+- **Score** — `round(throughput / baseline × 1000)`; the baseline
+  (6.0 Mpixel/s = 1000) is defined in `src/lotofbench.h`.
+- **Correctness** — every scene is verified inside the timed cycle
+  against its prepare-time reference: the SHA-1 of the normalized
+  weight stack and of the fused frame must match exactly, as must the
+  three counters (weight-starved pixels, clamped output pixels, black
+  output pixels), with the uniform-fallback and black-output guards at
+  zero; a broken pipeline aborts instead of scoring.
+
 ### Ray Tracer
 
 - **Metric** — millions of traced rays per second (Mray/s): every run
@@ -385,14 +419,16 @@ make test
 ```
 
 A dependency-free suite (no framework, same rules as the benchmark)
-covering 118 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
+covering 171 tests: SHA-1 against the RFC 3174 / NIST vectors, LZ4
 round-trips and format rejections, harness medians/scoring, and for
 each workload the determinism of its synthetic inputs, their documented
 invariants, golden pins on anything promised stable — and a
 differential test of Navigation's search against an independent full
 Dijkstra on every route, plus a differential test of HTML5 Browser's
 rasterizer against an independent brute-force compositor that
-re-derives every pixel from the display list. The suite is kept clean
+re-derives every pixel from the display list, plus HDR's constant-plane
+closed-form fusion (the fused value reduces to the documented weight
+math and is checked to the bit). The suite is kept clean
 under `-fsanitize=address,undefined`; golden values are regenerated
 with `tools/gen_goldens.c` after deliberate format changes only.
 
@@ -425,6 +461,8 @@ src/workload_horizon.[ch]    workload #12 — photo corpus, Canny + Hough
 src/workload_raytracer.[ch]  workload #15 — showroom, BVH, Whitted tracer
 src/itrig.[ch]               shared integer trig table (0.25-degree bins)
 src/workload_photofilter.[ch] workload #13 — photo corpus, filter cycles
+src/workload_hdr.[ch]         workload #14 — scene corpus, exposure burst,
+                              Mertens exposure-fusion pipeline
 src/imgops.[ch]               shared integer image kernels (blur, levels,
                               grayscale, Gaussian blur, color matrix,
                               crop, bilinear scale, box downscale)

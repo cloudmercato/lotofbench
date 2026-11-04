@@ -24,6 +24,7 @@
 #include "workload_backgroundblur.h"
 #include "workload_clang.h"
 #include "workload_compression.h"
+#include "workload_hdr.h"
 #include "workload_horizon.h"
 #include "workload_html5browser.h"
 #include "workload_navigation.h"
@@ -444,6 +445,45 @@ int main(void)
         printf("\nBB_SEED1_TASK_FRAMES_MULTI %llu",
                (unsigned long long)bb_task_frames(1));
         bb_free(bb);
+    }
+
+    /* hdr goldens (seed 1): per scene the planted boxes and clean
+     * luminances, the normalized-weight-stack and fused-frame SHA-1s
+     * and the exact counters */
+    {
+        hdr_ctx *hdr = hdr_prepare(1);
+
+        if (hdr) {
+            for (unsigned s = 0; s < HDR_SCENES; s++) {
+                const hdr_result *r = hdr_reference(hdr, s);
+                hdr_box hi, lo;
+
+                if (!r)
+                    continue;
+                hi = hdr_hilite_box(hdr, s);
+                lo = hdr_shadow_box(hdr, s);
+                printf("\nHDR_SEED1_S%u_ARCH %u", s, hdr_archetype(hdr, s));
+                printf("\nHDR_SEED1_S%u_HILITE %d %d %d %d %d", s,
+                       hi.x0, hi.y0, hi.x1, hi.y1,
+                       (int)hdr_hilite_luma(hdr, s));
+                printf("\nHDR_SEED1_S%u_SHADOW %d %d %d %d %d", s,
+                       lo.x0, lo.y0, lo.x1, lo.y1,
+                       (int)hdr_shadow_luma(hdr, s));
+                printf("\nHDR_SEED1_S%u_WEIGHTS", s);
+                for (int i = 0; i < 20; i++)
+                    printf(" %02x", r->weights_digest[i]);
+                printf("\nHDR_SEED1_S%u_FUSED", s);
+                for (int i = 0; i < 20; i++)
+                    printf(" %02x", r->fused_digest[i]);
+                printf("\nHDR_SEED1_S%u_COUNTERS %u %u %u", s,
+                       r->uniform, r->hi_clip, r->lo_black);
+            }
+            printf("\nHDR_SEED1_TASK_PIXELS %llu",
+                   (unsigned long long)hdr_task_pixels(0));
+            printf("\nHDR_SEED1_TASK_PIXELS_MULTI %llu",
+                   (unsigned long long)hdr_task_pixels(1));
+            hdr_free(hdr);
+        }
     }
     return 0;
 }

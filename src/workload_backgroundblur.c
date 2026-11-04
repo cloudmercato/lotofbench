@@ -288,14 +288,14 @@ void bb_mask_upscale(uint8_t *dst, size_t dw, size_t dh,
     for (size_t y = 0; y < dh; y++) {
         int64_t sy = sy0 + (int64_t)(dy * y);
         int64_t y0 = sy >> 16; /* floor, handles the negative start */
-        int64_t fy = sy - (y0 << 16);
+        int64_t fy = sy - y0 * 65536; /* no <<: y0 can be negative (UB) */
         size_t ya = (size_t)(y0 < 0 ? 0 : y0);
         size_t yb = (ya + 1 < sh) ? ya + 1 : sh - 1;
 
         for (size_t x = 0; x < dw; x++) {
             int64_t sx = sx0 + (int64_t)(dx * x);
             int64_t x0 = sx >> 16;
-            int64_t fx = sx - (x0 << 16);
+            int64_t fx = sx - x0 * 65536; /* no <<: x0 can be negative (UB) */
             size_t xa = (size_t)(x0 < 0 ? 0 : x0);
             size_t xb = (xa + 1 < sw) ? xa + 1 : sw - 1;
             uint32_t wx0 = 65536u - (uint32_t)fx;
