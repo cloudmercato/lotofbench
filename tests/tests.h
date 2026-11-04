@@ -230,4 +230,19 @@ void test_od_run_sane(void);
 void test_od_thread_clamp(void);
 void test_od_accessors_null_safe(void);
 
+/* --- workload #10: background blur ---------------------------------------------------*/
+void test_bb_frames_deterministic(void);
+void test_bb_input_invariants(void);
+void test_bb_seed_variation(void);
+void test_bb_segment_units(void);
+void test_bb_majority_units(void);
+void test_bb_mask_upscale_units(void);
+void test_bb_composite_units(void);
+void test_bb_differential_naive(void);
+void test_bb_mask_ground_truth(void);
+void test_bb_corpus_golden(void);
+void test_bb_run_sane(void);
+void test_bb_thread_clamp(void);
+void test_bb_accessors_null_safe(void);
+
 #endif /* LOTOFBENCH_TESTS_H */

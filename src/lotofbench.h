@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "0.13.0"
+#define LOTOFBENCH_VERSION   "0.14.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
@@ -17,6 +17,8 @@
 #define NAV_WORKLOAD_SLUG    "navigation"
 #define OD_WORKLOAD_NAME     "Object Detection"
 #define OD_WORKLOAD_SLUG     "object-detection"
+#define BB_WORKLOAD_NAME     "Background Blur"
+#define BB_WORKLOAD_SLUG     "background-blur"
 #define HTML5_WORKLOAD_NAME  "HTML5 Browser"
 #define HTML5_WORKLOAD_SLUG  "html5-browser"
 #define PDF_WORKLOAD_NAME    "PDF Render"
@@ -67,6 +69,13 @@
  * 300x300 photo through the 12-layer net in about 40 ms, scalar
  * plain-C speed) — a round and honest yardstick. */
 #define BASELINE_OBJDETECTION_IPS     25.0
+
+/* Workload #10 — Background Blur: video frames blurred per second
+ * (each one through the 1/4 segmentation, mask upsample, blur and
+ * per-pixel composite). The 1000-point reference machine blurs 50.0
+ * frames per second (a full 1920x1080 frame through the pipeline in
+ * about 20 ms, scalar plain-C speed) — a round and honest yardstick. */
+#define BASELINE_BACKGROUNDBLUR_FPS   50.0
 
 /* Workload #3 — HTML5 Browser: pages rendered per second (parse +
  * layout + raster of one 800x600 page). The 1000-point reference

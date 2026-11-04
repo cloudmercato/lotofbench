@@ -178,6 +178,21 @@ static const test_entry TESTS[] = {
     { "objectdetection/run-sane", test_od_run_sane },
     { "objectdetection/thread-clamp", test_od_thread_clamp },
     { "objectdetection/null-accessors", test_od_accessors_null_safe },
+    /* workload #10 — background blur */
+    { "backgroundblur/frames-deterministic",
+      test_bb_frames_deterministic },
+    { "backgroundblur/input-invariants", test_bb_input_invariants },
+    { "backgroundblur/seed-variation", test_bb_seed_variation },
+    { "backgroundblur/segment-units", test_bb_segment_units },
+    { "backgroundblur/majority-units", test_bb_majority_units },
+    { "backgroundblur/mask-upscale-units", test_bb_mask_upscale_units },
+    { "backgroundblur/composite-units", test_bb_composite_units },
+    { "backgroundblur/differential-naive", test_bb_differential_naive },
+    { "backgroundblur/mask-ground-truth", test_bb_mask_ground_truth },
+    { "backgroundblur/corpus-golden", test_bb_corpus_golden },
+    { "backgroundblur/run-sane", test_bb_run_sane },
+    { "backgroundblur/thread-clamp", test_bb_thread_clamp },
+    { "backgroundblur/null-accessors", test_bb_accessors_null_safe },
 };
 
 int main(void)

@@ -24,7 +24,7 @@ Floating Point 35%). The official list, with the LotofBench status:
 | 7 | Text Processing               | Regex parsing, Markdown→HTML (Python) | **implemented v0.5** |
 | 8 | Asset Compression             | ASTC/BC7/DXT5 texture codecs, Draco mesh | **implemented v0.11** |
 | 9 | Object Detection              | MobileNet v1 SSD over photos       | **implemented v0.13** |
-| 10| Background Blur               | DeepLabV3+ segmentation on video frames | planned |
+| 10| Background Blur               | DeepLabV3+ segmentation on video frames | **implemented v0.14** |
 | 11| Object Remover                | Inpainting (content-aware fill)    | planned |
 | 12| Horizon Detection             | Canny edges + Hough transform      | **implemented v0.8** |
 | 13| Photo Filter                  | Color/blur filters, crop, scale    | **implemented v0.7** |
@@ -485,6 +485,66 @@ seeded photos instead of a real capture set, and the input quantize
 standing in for the SSP/resize preprocessing. The throughput metric
 (photos per second) is unaffected because the MAC count is exact,
 fixed and machine-independent.
+
+## Workload 10 — Background Blur (implemented)
+
+Geekbench 6's Background Blur workload runs DeepLabV3+ segmentation
+over video frames and blurs the background behind the detected
+subject — the portrait-mode video-call effect. LotofBench v0.14
+reproduces the shape dependency-free, integer-only, with exact
+background subtraction standing in for the trained model:
+
+- **Frames**: 12 seeded 1920x1080 RGB frames in four archetype
+  families cycling the way a clip reel does — video call, living
+  room, backyard, office. Each frame is a two-stop vertical
+  background gradient plus per-pixel noise (±6 per channel); one
+  subject — a 180-360 x 300-600 px rectangle darkened by 50-90 per
+  channel, kept at least 16 px inside the frame — is planted per
+  frame. The background is identical across the frames of one
+  archetype (a static camera), so a prepare-time background model per
+  archetype is exact: the segmentation does not have to guess. The
+  subject boxes and tones are ground truth, exposed through accessors
+  and verified at prepare time. Fixed `--seed` means byte-identical
+  frames on every machine; generation is off the clock.
+- **The model**: per archetype, the exact 1/4 box downscale of the
+  noiseless background, derived from the hard-coded archetype
+  palettes — independent of `--seed`, part of the workload's identity
+  like the Object Detection net, shared read-only across contexts and
+  SHA-1-pinned.
+- **The pipeline** (per frame, inside the timed section): box
+  downscale 1/4 to the 480x270 segmentation tap; per-cell maximum
+  absolute channel difference against the frame's archetype model,
+  thresholded at 24 (the subject darkening is at least 50 per
+  channel, the noise floor ±6 — every pure-subject cell fires, no
+  pure-background cell ever does); a 3x3 majority filter over the
+  480x270 plane (a cell survives on at least 5 of its 9
+  window cells, zero padding); bilinear x4 upsample of the binary
+  mask back to 1920x1080 (eighth-weight fixed point, one half-up
+  rounding); a radius-9 separable box blur of the full frame (the
+  imgops running-sum kernel, edge-clamped); and the per-pixel
+  composite `out = (m·frame + (255−m)·blurred + 127) / 255` — blur
+  strength modulated per pixel by the mask.
+- **Verification**: every timed cycle re-runs the full pipeline per
+  frame and checks the SHA-1 of the mask and of the composited output
+  against prepare-time references, plus exact counters (mask-255
+  pixels and changed pixels). Any drift aborts the run instead of
+  scoring.
+- **Cycle**: one run = all 12 frames through the pipeline, timed as a
+  whole with `CLOCK_MONOTONIC`, reported as frames per second. The
+  multi-core pass runs 48 frame instances (4x the set) split across
+  threads.
+
+Known v0.14 divergences from Geekbench 6, all deliberate: exact
+background subtraction against a prepare-time model instead of
+trained DeepLabV3+ segmentation (the static-camera corpus makes the
+model exact, so the mask is deterministic ground truth derived from
+the planted subjects — the compute is a stand-in, not an accuracy
+run), a single-frame pipeline instead of temporal mask smoothing,
+synthetic seeded frames instead of a real video clip, and the
+radius-9 box blur (the shared imgops kernel) standing in for GB6's
+tiled Gaussian stack. The throughput metric (frames per second) is
+unaffected because the pipeline is 100% integer, bit-exact and
+machine-independent.
 
 ## Workload 12 — Horizon Detection (implemented)
 
