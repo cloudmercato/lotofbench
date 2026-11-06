@@ -30,7 +30,8 @@
  * the decoded labels are not real detections — what the workload
  * measures is quantized conv-net throughput (images per second), and
  * what it verifies is the exact byte-level reproducibility of the whole
- * inference, the contract the roadmap prescribes for this workload. */
+ * inference, the contract docs/benchmarks.md prescribes for this
+ * workload. */
 
 typedef struct od_ctx od_ctx;
 

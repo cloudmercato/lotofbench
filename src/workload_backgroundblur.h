@@ -47,7 +47,8 @@
  * net, so the mask provably recovers the planted subject — the
  * workload verifies real segmentation quality (subject interior sharp,
  * background blurred) and mask + composite throughput (frames per
- * second), the contract the roadmap prescribes for this workload. */
+ * second), the contract docs/benchmarks.md prescribes for this
+ * workload. */
 
 typedef struct bb_ctx bb_ctx;
 

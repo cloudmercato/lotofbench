@@ -17,9 +17,8 @@ Compression**, **Object Detection**, **Background Blur**, **Horizon
 Detection**, **Photo Filter**, **HDR**, **Ray Tracer**, **Structure
 from Motion** and **Object Remover** are implemented (sixteen of the
 Geekbench 6 CPU workloads — all of them). The full
-workload list, the roadmap and the suggested landing order live in
-[docs/benchmarks.md](docs/benchmarks.md) and
-[ROADMAP.md](ROADMAP.md).
+workload list, the methodology and the scoring rules live in
+[docs/benchmarks.md](docs/benchmarks.md).
 
 - **File Compression** — compress and decompress a corpus with LZ4 at
   two compression ratios, verify every round-trip with SHA-1, score the
@@ -390,7 +389,6 @@ tools/gen_goldens.c           regenerates the golden pins of the tests
 docs/benchmarks.md            the workload list, methodology and scoring rules
 docs/sample-output.md         a captured default run (text report, composite included)
 docs/sample-output.json       the same run's JSON document (schema 1)
-ROADMAP.md                    remaining workloads, cross-cutting plan, test rules
 ```
 
 ## License
