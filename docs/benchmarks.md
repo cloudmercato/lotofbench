@@ -990,9 +990,8 @@ per-workload scores are still published alongside.
 
 Since 1.0.0 the suite publishes, in addition to the per-workload
 scores, a composite score per core mode, computed the Geekbench 6 way.
-Each workload belongs to one of two sections — the grouping of
-ROADMAP.md's section tables (Geekbench 6 does not publish its own
-membership):
+Each workload belongs to one of two sections (Geekbench 6 does not
+publish its own membership):
 
 - **Integer (65%)** — File Compression, Navigation, HTML5 Browser,
   PDF Render, Photo Library, Clang, Text Processing, Asset
