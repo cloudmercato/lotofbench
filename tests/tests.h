@@ -72,6 +72,10 @@ void test_lz4_small_thread_stack(void);
 void test_parse_uint_valid(void);
 void test_parse_uint_invalid(void);
 
+/* --- sysinfo ---------------------------------------------------------------------*/
+void test_sysinfo_sane(void);
+void test_sysinfo_repeatable(void);
+
 /* --- harness ---------------------------------------------------------------------*/
 void test_median_odd_even(void);
 void test_score_rounding(void);

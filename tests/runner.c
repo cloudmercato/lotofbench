@@ -27,6 +27,9 @@ static const test_entry TESTS[] = {
     /* cli */
     { "cli/parse-uint-valid", test_parse_uint_valid },
     { "cli/parse-uint-invalid", test_parse_uint_invalid },
+    /* sysinfo */
+    { "sysinfo/sane", test_sysinfo_sane },
+    { "sysinfo/repeatable", test_sysinfo_repeatable },
     /* harness */
     { "harness/median", test_median_odd_even },
     { "harness/score-rounding", test_score_rounding },
