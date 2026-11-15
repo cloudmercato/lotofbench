@@ -13,6 +13,7 @@ LDLIBS   = -lm
 SRC = src/main.c \
       src/cli.c \
       src/harness.c \
+      src/sysinfo.c \
       src/rng.c \
       src/workload_compression.c \
       src/workload_navigation.c \
@@ -39,6 +40,7 @@ SRC = src/main.c \
 HDR = src/lotofbench.h \
       src/cli.h \
       src/harness.h \
+      src/sysinfo.h \
       src/rng.h \
       src/workload_compression.h \
       src/workload_navigation.h \
@@ -70,6 +72,7 @@ TESTS_SRC = tests/runner.c \
             tests/test_lz4.c \
             tests/test_harness.c \
             tests/test_cli.c \
+            tests/test_sysinfo.c \
             tests/test_workload_compression.c \
             tests/test_workload_navigation.c \
             tests/test_workload_objectdetection.c \

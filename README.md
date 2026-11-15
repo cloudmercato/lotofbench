@@ -142,6 +142,16 @@ File Compression corpus; every other workload uses fixed-size inputs
 (the map is the map, the pages are the pages) that vary only with
 `--seed`.
 
+Every run starts with a hardware report, printed before the tests in
+text mode and embedded as a top-level `hardware` object in the JSON
+document (schema 1, additive): CPU brand, vendor, family/model,
+sockets, cores, threads, frequency, L2/L3 caches, total/free RAM,
+total/free swap, the NUMA layout (numactl-style node map), the
+1-minute load average, OS/kernel and the compiler that built the
+binary. It works on Linux and macOS, x86 (CPUID) and ARM. Every field
+is best-effort: what a platform does not expose is skipped in text and
+`""`/`0` in JSON, and capture never fails the run.
+
 Real output of a default run on the development box (12 threads) is
 kept in [docs/sample-output.md](docs/sample-output.md), with the same
 run's machine-readable results in

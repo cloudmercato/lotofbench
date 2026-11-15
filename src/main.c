@@ -8,6 +8,7 @@
 
 #include "cli.h"
 #include "harness.h"
+#include "sysinfo.h"
 #include "lotofbench.h"
 #include "workload_assetcompression.h"
 #include "workload_backgroundblur.h"
@@ -239,7 +240,75 @@ static void print_block(const char *unit, double baseline,
     printf("  score       %9ld\n", multi->score);
 }
 
+/* The hardware report, printed before the suite runs (text mode).
+ * Unknown fields are skipped so VMs and minimal systems stay clean. */
+static void print_hardware(FILE *out, const lb_sysinfo *sys)
+{
+    fprintf(out, "Hardware\n");
+    fprintf(out, "  os           : %s %s (%s)\n",
+            sys->os[0] ? sys->os : "unknown", sys->kernel, sys->machine);
+    fprintf(out, "  compiler     : %s (%s)\n", sys->compiler, sys->arch);
+    if (sys->brand[0])
+        fprintf(out, "  cpu          : %s\n", sys->brand);
+    if (sys->vendor[0])
+        fprintf(out,
+                "  cpu details  : %s, family %u, model %u, stepping %u\n",
+                sys->vendor, sys->family, sys->model, sys->stepping);
+    fprintf(out, "  topology     : %u socket(s), %u core(s), %u thread(s)",
+            sys->sockets, sys->cores, sys->threads);
+    if (sys->core_layout[0])
+        fprintf(out, " (%s)", sys->core_layout);
+    fprintf(out, "\n");
+    if (sys->freq_mhz > 0)
+        fprintf(out, "  frequency    : %.0f MHz\n", sys->freq_mhz);
+    if (sys->l2_kb || sys->l3_kb) {
+        fprintf(out, "  caches       :");
+        if (sys->l2_kb)
+            fprintf(out, " L2 %lu KB", sys->l2_kb);
+        if (sys->l3_kb)
+            fprintf(out, " L3 %lu KB", sys->l3_kb);
+        fprintf(out, "\n");
+    }
+    if (sys->ram_total) {
+        fprintf(out, "  memory       : %llu MB total",
+                (unsigned long long)sys->ram_total / 1048576);
+        if (sys->ram_free)
+            fprintf(out, ", %llu MB free",
+                    (unsigned long long)sys->ram_free / 1048576);
+        fprintf(out, "\n");
+    }
+    if (sys->swap_total) {
+        fprintf(out, "  swap         : %llu MB total",
+                (unsigned long long)sys->swap_total / 1048576);
+        if (sys->swap_free)
+            fprintf(out, ", %llu MB free",
+                    (unsigned long long)sys->swap_free / 1048576);
+        fprintf(out, "\n");
+    }
+    fprintf(out, "  numa         : %u node(s)", sys->numa_nodes);
+    if (sys->numa_map[0])
+        fprintf(out, " (%s)", sys->numa_map);
+    fprintf(out, "\n");
+    if (sys->load_1m >= 0)
+        fprintf(out, "  load average : %.2f (1m)\n", sys->load_1m);
+}
+
+/* Write a string as a JSON string literal, escaping quotes and
+ * backslashes (the cpu brand strings and sysfs lists are plain ASCII,
+ * this is defence, not a normal case). */
+static void json_puts(FILE *out, const char *s)
+{
+    fputc('"', out);
+    for (; *s; s++) {
+        if (*s == '"' || *s == '\\')
+            fputc('\\', out);
+        fputc(*s, out);
+    }
+    fputc('"', out);
+}
+
 static void print_json(FILE *out, const options *opt,
+                       const lb_sysinfo *sys,
                        const lb_result *fc_single,
                        const lb_result *fc_multi,
                        const lb_result *nav_single,
@@ -290,6 +359,66 @@ static void print_json(FILE *out, const options *opt,
             "  \"seed\": %u,\n", opt->seed);
     fprintf(out,
             "  \"runs\": %u,\n", opt->runs);
+    fprintf(out,
+            "  \"hardware\": {\n");
+    fprintf(out,
+            "    \"os\": "); json_puts(out, sys->os); fprintf(out, ",\n");
+    fprintf(out,
+            "    \"kernel\": "); json_puts(out, sys->kernel); fprintf(out, ",\n");
+    fprintf(out,
+            "    \"machine\": "); json_puts(out, sys->machine); fprintf(out, ",\n");
+    fprintf(out,
+            "    \"arch\": "); json_puts(out, sys->arch); fprintf(out, ",\n");
+    fprintf(out,
+            "    \"compiler\": "); json_puts(out, sys->compiler);
+    fprintf(out,
+            ",\n");
+    fprintf(out,
+            "    \"load_1m\": %.2f,\n", sys->load_1m);
+    fprintf(out,
+            "    \"cpu\": {\n");
+    fprintf(out,
+            "      \"brand\": "); json_puts(out, sys->brand); fprintf(out, ",\n");
+    fprintf(out,
+            "      \"vendor\": "); json_puts(out, sys->vendor);
+    fprintf(out,
+            ",\n");
+    fprintf(out,
+            "      \"family\": %u, \"model\": %u, \"stepping\": %u,\n",
+            sys->family, sys->model, sys->stepping);
+    fprintf(out,
+            "      \"sockets\": %u, \"cores\": %u, \"threads\": %u,\n",
+            sys->sockets, sys->cores, sys->threads);
+    fprintf(out,
+            "      \"layout\": "); json_puts(out, sys->core_layout);
+    fprintf(out,
+            ",\n");
+    fprintf(out,
+            "      \"freq_mhz\": %.1f,\n", sys->freq_mhz);
+    fprintf(out,
+            "      \"l2_kb\": %lu, \"l3_kb\": %lu\n", sys->l2_kb, sys->l3_kb);
+    fprintf(out,
+            "    },\n");
+    fprintf(out,
+            "    \"memory\": {\n");
+    fprintf(out,
+            "      \"ram_total\": %llu, \"ram_free\": %llu,\n",
+            (unsigned long long)sys->ram_total, (unsigned long long)sys->ram_free);
+    fprintf(out,
+            "      \"swap_total\": %llu, \"swap_free\": %llu\n",
+            (unsigned long long)sys->swap_total, (unsigned long long)sys->swap_free);
+    fprintf(out,
+            "    },\n");
+    fprintf(out,
+            "    \"numa\": {\n");
+    fprintf(out,
+            "      \"nodes\": %u,\n", sys->numa_nodes);
+    fprintf(out,
+            "      \"map\": "); json_puts(out, sys->numa_map); fprintf(out, "\n");
+    fprintf(out,
+            "    }\n");
+    fprintf(out,
+            "  },\n");
     fprintf(out,
             "  \"workloads\": [\n");
     fprintf(out,
@@ -545,6 +674,18 @@ int main(int argc, char **argv)
         }
     }
 
+    /* Hardware report: captured off the clock before anything runs,
+     * so the machine context is visible while the suite executes (text
+     * mode) and lands in the JSON document. */
+    lb_sysinfo sys;
+    lb_sysinfo_capture(&sys);
+    if (!opt.json) {
+        printf("LotofBench %s\n", LOTOFBENCH_VERSION);
+        printf("seed %u, %u runs, median\n\n", opt.seed, opt.runs);
+        print_hardware(stdout, &sys);
+        printf("\n");
+    }
+
     fc_ctx *fc = fc_prepare(opt.corpus_mb, opt.seed);
     nav_ctx *nav = nav_prepare(opt.seed);
     html5_ctx *h5 = html5_prepare(opt.seed);
@@ -697,7 +838,7 @@ int main(int argc, char **argv)
     long composite_multi = lb_composite(integer_multi, floating_multi);
 
     if (opt.json) {
-        print_json(stdout, &opt, &fc_single, &fc_multi, &nav_single,
+        print_json(stdout, &opt, &sys, &fc_single, &fc_multi, &nav_single,
                    &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
                    html5_elements(h5), &pdf_single, &pdf_multi,
                    pdf_pixels, &pl_single, &pl_multi, pl_photos,
@@ -716,7 +857,7 @@ int main(int argc, char **argv)
                    composite_multi);
     }
     if (json_out) {
-        print_json(json_out, &opt, &fc_single, &fc_multi, &nav_single,
+        print_json(json_out, &opt, &sys, &fc_single, &fc_multi, &nav_single,
                    &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
                    html5_elements(h5), &pdf_single, &pdf_multi,
                    pdf_pixels, &pl_single, &pl_multi, pl_photos,
@@ -791,8 +932,6 @@ int main(int argc, char **argv)
                  "%u pairs, %ux%u px, %u scene points, FAST+RANSAC",
                  SFM_PAIRS, SFM_VIEW_W, SFM_VIEW_H, SFM_SCENE_POINTS);
 
-        printf("LotofBench %s\n", LOTOFBENCH_VERSION);
-        printf("seed %u, %u runs, median\n\n", opt.seed, opt.runs);
         printf("%s (%s)\n", FC_WORKLOAD_NAME, fc_cfg);
         print_block("MB/s", BASELINE_FILECOMPRESSION_MBPS, &fc_single,
                     &fc_multi);
