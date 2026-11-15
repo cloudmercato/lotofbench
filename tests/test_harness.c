@@ -5,6 +5,7 @@
 
 #include "harness.h"
 
+#include <errno.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -124,4 +125,47 @@ void test_harness_single_thread(void)
 
     CHECK(harness_run(1, 2, counting_cycle, ctxs, elapsed) == 0);
     CHECK_U64(c.count, 2);
+}
+
+/* Thread-start seam: let the first worker through (the real
+ * pthread_create), then fail the rest as if the thread limit was hit. */
+static int fail_after_first(pthread_t *tid, const pthread_attr_t *attr,
+                            void *(*start)(void *), void *arg)
+{
+    static int calls;
+
+    if (calls++ == 0)
+        return pthread_create(tid, attr, start, arg);
+    return EAGAIN;
+}
+
+/* All starts fail: no worker is ever created. */
+static int fail_all_starts(pthread_t *tid, const pthread_attr_t *attr,
+                           void *(*start)(void *), void *arg)
+{
+    (void)tid; (void)attr; (void)start; (void)arg;
+
+    return EAGAIN;
+}
+
+void test_harness_thread_creation_failure(void)
+{
+    enum { T = 4, R = 2 };
+    count_ctx ctx_data[T] = { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } };
+    void *ctxs[T] = { &ctx_data[0], &ctx_data[1], &ctx_data[2],
+                      &ctx_data[3] };
+    double elapsed[R];
+
+    /* One worker created, the rest failing: the created worker must
+     * still make progress (the start gate shrinks to it) and the run
+     * must fail cleanly with -1. If this test hangs, the harness
+     * deadlocked on partial thread creation. */
+    harness_set_thread_start(fail_after_first);
+    CHECK(harness_run(T, R, counting_cycle, ctxs, elapsed) == -1);
+    CHECK_U64(ctx_data[0].count, R); /* the created worker did its runs */
+
+    /* No worker at all: still a clean -1, no hang. */
+    harness_set_thread_start(fail_all_starts);
+    CHECK(harness_run(T, R, counting_cycle, ctxs, elapsed) == -1);
+    harness_set_thread_start(NULL); /* restore for the other tests */
 }

@@ -117,11 +117,14 @@ workload list, the methodology and the scoring rules live in
 ## Build (one command)
 
 ```sh
-cc -O2 -std=c11 -pthread src/*.c -o lotofbench -lm
+cc -O2 -std=c11 -ffp-contract=off -pthread src/*.c -o lotofbench -lm
 ```
 
 or `make` (same flags, tracked by the Makefile). No external library, any
-C11 compiler, Linux/macOS/BSD.
+C11 compiler, Linux/macOS/BSD. `-ffp-contract=off` is mandatory: without
+it a compiler may contract float operations into FMAs and the bit-exact
+verification of the timed cycles aborts the run instead of scoring it
+(docs/benchmarks.md, "Workload 4").
 
 ## Usage
 

@@ -11,6 +11,7 @@ FPC      = -ffp-contract=off
 LDLIBS   = -lm
 
 SRC = src/main.c \
+      src/cli.c \
       src/harness.c \
       src/rng.c \
       src/workload_compression.c \
@@ -36,6 +37,7 @@ SRC = src/main.c \
       src/lz4.c \
       src/sha1.c
 HDR = src/lotofbench.h \
+      src/cli.h \
       src/harness.h \
       src/rng.h \
       src/workload_compression.h \
@@ -67,6 +69,7 @@ TESTS_SRC = tests/runner.c \
             tests/test_sha1.c \
             tests/test_lz4.c \
             tests/test_harness.c \
+            tests/test_cli.c \
             tests/test_workload_compression.c \
             tests/test_workload_navigation.c \
             tests/test_workload_objectdetection.c \

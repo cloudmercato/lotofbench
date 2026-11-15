@@ -85,6 +85,15 @@ static unsigned live_threads = 0;
 static unsigned ready_count = 0, done_count = 0, run_index = 0;
 static double run_t0[MAX_RUNS], run_t1[MAX_RUNS];
 
+/* The worker-start seam: pthread_create by default; tests inject a
+ * failing starter through harness_set_thread_start. */
+static lb_thread_start_fn thread_start = pthread_create;
+
+void harness_set_thread_start(lb_thread_start_fn fn)
+{
+    thread_start = fn ? fn : pthread_create;
+}
+
 static void *worker(void *arg)
 {
     hjob *j = arg;
@@ -146,12 +155,23 @@ int harness_run(unsigned threads, unsigned runs, lb_cycle_fn cycle,
         jobs[t].ctx = ctxs[t];
         jobs[t].runs = runs;
         jobs[t].failed = 0;
-        if (pthread_create(&tids[t], NULL, worker, &jobs[t]) != 0) {
+        if (thread_start(&tids[t], NULL, worker, &jobs[t]) != 0) {
             fprintf(stderr, "lotofbench: cannot start thread %u\n", t);
             rc = -1;
             break;
         }
         created++;
+    }
+    if (created < threads) {
+        /* Thread creation failed partway: the missing threads can
+         * never reach the start gate, so shrink the gate to the count
+         * actually created and wake the waiters — otherwise every
+         * created thread blocks forever and pthread_join below never
+         * returns. */
+        pthread_mutex_lock(&sync_lock);
+        live_threads = created;
+        pthread_cond_broadcast(&sync_cv);
+        pthread_mutex_unlock(&sync_lock);
     }
     for (unsigned t = 0; t < created; t++)
         pthread_join(tids[t], NULL);

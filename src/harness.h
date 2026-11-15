@@ -2,6 +2,7 @@
 #define HARNESS_H
 
 #include <stddef.h>
+#include <pthread.h>
 
 #include "lotofbench.h"
 
@@ -46,5 +47,14 @@ long lb_composite(long integer_score, long floating_score);
  * thread creation failed or any cycle reported a verification failure. */
 int harness_run(unsigned threads, unsigned runs, lb_cycle_fn cycle,
                 void **ctxs, double *elapsed);
+
+/* Test seam over pthread_create: the harness starts its workers through
+ * this function pointer (pthread_create by default) so tests can inject
+ * thread-creation failures and prove the run still terminates. */
+typedef int (*lb_thread_start_fn)(pthread_t *t, const pthread_attr_t *attr,
+                                  void *(*start)(void *), void *arg);
+
+/* Swap the harness's worker-start call; NULL restores pthread_create. */
+void harness_set_thread_start(lb_thread_start_fn fn);
 
 #endif /* HARNESS_H */
