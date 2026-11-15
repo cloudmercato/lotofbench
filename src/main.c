@@ -4,16 +4,9 @@
  * order of the Geekbench 6 CPU workload list (docs/benchmarks.md), and
  * prints one calibrated score per workload. The per-workload machinery
  * lives in workload_*.c; the shared-task threading and timing in
- * harness.c; this file owns the CLI and the output. */
+ * harness.c; the CLI in cli.c; this file owns the output. */
 
-#define _POSIX_C_SOURCE 200809L
-/* macOS gates _SC_NPROCESSORS_ONLN (and friends) behind the Darwin
- * extensions: a strict _POSIX_C_SOURCE alone hides it from <unistd.h>.
- * Re-expose them so the one-command build works on macOS. */
-#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
-#define _DARWIN_C_SOURCE 200809L
-#endif
-
+#include "cli.h"
 #include "harness.h"
 #include "lotofbench.h"
 #include "workload_assetcompression.h"
@@ -36,67 +29,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-
-typedef struct {
-    unsigned corpus_mb, runs, seed, threads; /* requested thread count */
-    int json;
-    const char *json_out; /* also store the JSON document in this file */
-} options;
-
-static void usage(FILE *out)
-{
-    fprintf(out,
-            "usage: lotofbench [--size-mb N] [--runs N] [--threads N] "
-            "[--seed N] [--json] [--json-out PATH]\n");
-}
-
-static options parse_args(int argc, char **argv)
-{
-    options o = { DEFAULT_CORPUS_MB, DEFAULT_RUNS, DEFAULT_SEED, 0, 0,
-              NULL };
-    long nproc = sysconf(_SC_NPROCESSORS_ONLN);
-
-    if (nproc < 1)
-        nproc = 1;
-    o.threads = (unsigned)nproc;
-    if (o.threads > DEFAULT_THREADS_CAP)
-        o.threads = DEFAULT_THREADS_CAP;
-
-    for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "--size-mb") && i + 1 < argc) {
-            o.corpus_mb = (unsigned)strtoul(argv[++i], NULL, 10);
-        } else if (!strcmp(argv[i], "--runs") && i + 1 < argc) {
-            o.runs = (unsigned)strtoul(argv[++i], NULL, 10);
-        } else if (!strcmp(argv[i], "--threads") && i + 1 < argc) {
-            o.threads = (unsigned)strtoul(argv[++i], NULL, 10);
-        } else if (!strcmp(argv[i], "--seed") && i + 1 < argc) {
-            o.seed = (unsigned)strtoul(argv[++i], NULL, 10);
-        } else if (!strcmp(argv[i], "--json")) {
-            o.json = 1;
-        } else if (!strcmp(argv[i], "--json-out") && i + 1 < argc) {
-            o.json_out = argv[++i];
-        } else if (!strcmp(argv[i], "--help")) {
-            usage(stdout);
-            exit(0);
-        } else {
-            fprintf(stderr, "lotofbench: bad or incomplete option '%s'\n",
-                    argv[i]);
-            usage(stderr);
-            exit(2);
-        }
-    }
-    if (o.corpus_mb < 1)
-        o.corpus_mb = 1;
-    if (o.runs < 1 || o.runs > MAX_RUNS) {
-        fprintf(stderr, "lotofbench: --runs must be between 1 and %u\n",
-                MAX_RUNS);
-        exit(2);
-    }
-    if (o.threads < 1)
-        o.threads = 1;
-    return o;
-}
 
 /* --- running the suite ------------------------------------------------------*/
 

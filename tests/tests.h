@@ -68,6 +68,10 @@ void test_lz4_incompressible_overhead(void);
 void test_lz4_rejects_malformed(void);
 void test_lz4_small_thread_stack(void);
 
+/* --- cli ---------------------------------------------------------------------*/
+void test_parse_uint_valid(void);
+void test_parse_uint_invalid(void);
+
 /* --- harness ---------------------------------------------------------------------*/
 void test_median_odd_even(void);
 void test_score_rounding(void);
@@ -77,6 +81,7 @@ void test_composite_weighting(void);
 void test_harness_counts_and_times(void);
 void test_harness_failure_propagates(void);
 void test_harness_single_thread(void);
+void test_harness_thread_creation_failure(void);
 
 /* --- workload #1: file compression --------------------------------------------------*/
 void test_fc_deterministic_corpus(void);

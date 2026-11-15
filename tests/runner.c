@@ -24,6 +24,9 @@ static const test_entry TESTS[] = {
     { "lz4/incompressible-overhead", test_lz4_incompressible_overhead },
     { "lz4/rejects-malformed", test_lz4_rejects_malformed },
     { "lz4/small-thread-stack", test_lz4_small_thread_stack },
+    /* cli */
+    { "cli/parse-uint-valid", test_parse_uint_valid },
+    { "cli/parse-uint-invalid", test_parse_uint_invalid },
     /* harness */
     { "harness/median", test_median_odd_even },
     { "harness/score-rounding", test_score_rounding },
@@ -33,6 +36,8 @@ static const test_entry TESTS[] = {
     { "harness/counts-and-times", test_harness_counts_and_times },
     { "harness/failure-propagates", test_harness_failure_propagates },
     { "harness/single-thread", test_harness_single_thread },
+    { "harness/thread-creation-failure",
+      test_harness_thread_creation_failure },
     /* workload #1 — file compression */
     { "compression/deterministic-corpus", test_fc_deterministic_corpus },
     { "compression/corpus-golden-v0.1", test_fc_corpus_golden },
