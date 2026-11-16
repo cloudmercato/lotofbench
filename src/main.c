@@ -17,6 +17,7 @@
 #include "harness.h"
 #include "sysinfo.h"
 #include "upload/sysinfo.h"
+#include "upload/upload.h"
 #include "lotofbench.h"
 #include "workload_assetcompression.h"
 #include "workload_backgroundblur.h"
@@ -719,6 +720,26 @@ int main(int argc, char **argv)
      * environment (container → vm → bare-metal), probed off the clock. */
     lb_system_profile profile;
     lb_system_profile_capture(&profile, &sys);
+
+    /* Portal upload, phase 1: the single-use session is requested
+     * BEFORE the passes run — the portal rejects a submission whose
+     * claimed runtime exceeds the session age, so the session clock
+     * must cover the whole benchmark. */
+    upload_session session;
+    upload_result upload_diag;
+
+    if (opt.upload &&
+        upload_session_begin(upload_base_url(), &session,
+                             &upload_diag) != UPLOAD_OK) {
+        fprintf(stderr, "lotofbench: upload failed (%s)",
+                upload_rc_name(UPLOAD_ERR_NETWORK));
+        if (upload_diag.reason[0])
+            fprintf(stderr, ": %s", upload_diag.reason);
+        fputc('\n', stderr);
+        if (json_out)
+            fclose(json_out);
+        return 1;
+    }
     if (!opt.json) {
         printf("LotofBench %s\n", LOTOFBENCH_VERSION);
         printf("seed %u, %u runs, median\n\n", opt.seed, opt.runs);
@@ -889,45 +910,40 @@ int main(int argc, char **argv)
     long composite_single = lb_composite(integer_single, floating_single);
     long composite_multi = lb_composite(integer_multi, floating_multi);
 
-    if (opt.json) {
-        print_json(stdout, &opt, &sys, &profile,
-                   runtime_seconds, &fc_single, &fc_multi, &nav_single,
-                   &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
-                   html5_elements(h5), &pdf_single, &pdf_multi,
-                   pdf_pixels, &pl_single, &pl_multi, pl_photos,
-                   &cl_single, &cl_multi, cl_tokens,
-                   &tp_single, &tp_multi, tp_bytes, &ac_single, &ac_multi,
-                   ac_bytes, &od_single, &od_multi, od_images,
-                   &bb_single, &bb_multi, bb_frames,
-                   &orem_single, &orem_multi, orem_pixels,
-                   &hd_single, &hd_multi,
-                   hd_pixels, &pf_single, &pf_multi, pf_pixels,
-                   &hdr_single, &hdr_multi, hdr_pixels,
-                   &rt_single, &rt_multi, rt_rays,
-                   (unsigned)rt_tri_count(rt), &sfm_single, &sfm_multi,
-                   sfm_pairs, integer_single, integer_multi,
-                   floating_single, floating_multi, composite_single,
-                   composite_multi);
+    /* Build the schema-1 document once in memory: --json, --json-out
+     * and the portal upload all consume the same bytes. */
+    char *doc = NULL;
+    size_t doc_len = 0;
+    FILE *doc_stream = open_memstream(&doc, &doc_len);
+
+    if (!doc_stream) {
+        fprintf(stderr, "lotofbench: out of memory building the document\n");
+        return 1;
     }
+    print_json(doc_stream, &opt, &sys, &profile,
+               runtime_seconds, &fc_single, &fc_multi, &nav_single,
+               &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
+               html5_elements(h5), &pdf_single, &pdf_multi,
+               pdf_pixels, &pl_single, &pl_multi, pl_photos,
+               &cl_single, &cl_multi, cl_tokens,
+               &tp_single, &tp_multi, tp_bytes, &ac_single, &ac_multi,
+               ac_bytes, &od_single, &od_multi, od_images,
+               &bb_single, &bb_multi, bb_frames,
+               &orem_single, &orem_multi, orem_pixels,
+               &hd_single, &hd_multi,
+               hd_pixels, &pf_single, &pf_multi, pf_pixels,
+               &hdr_single, &hdr_multi, hdr_pixels,
+               &rt_single, &rt_multi, rt_rays,
+               (unsigned)rt_tri_count(rt), &sfm_single, &sfm_multi,
+               sfm_pairs, integer_single, integer_multi,
+               floating_single, floating_multi, composite_single,
+               composite_multi);
+    fclose(doc_stream);
+
+    if (opt.json)
+        fwrite(doc, 1, doc_len, stdout);
     if (json_out) {
-        print_json(json_out, &opt, &sys, &profile,
-                   runtime_seconds, &fc_single, &fc_multi, &nav_single,
-                   &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
-                   html5_elements(h5), &pdf_single, &pdf_multi,
-                   pdf_pixels, &pl_single, &pl_multi, pl_photos,
-                   &cl_single, &cl_multi, cl_tokens,
-                   &tp_single, &tp_multi, tp_bytes, &ac_single, &ac_multi,
-                   ac_bytes, &od_single, &od_multi, od_images,
-                   &bb_single, &bb_multi, bb_frames,
-                   &orem_single, &orem_multi, orem_pixels,
-                   &hd_single, &hd_multi,
-                   hd_pixels, &pf_single, &pf_multi, pf_pixels,
-                   &hdr_single, &hdr_multi, hdr_pixels,
-                   &rt_single, &rt_multi, rt_rays,
-                   (unsigned)rt_tri_count(rt), &sfm_single, &sfm_multi,
-                   sfm_pairs, integer_single, integer_multi,
-                   floating_single, floating_multi, composite_single,
-                   composite_multi);
+        fwrite(doc, 1, doc_len, json_out);
         if (fclose(json_out) != 0) {
             fprintf(stderr, "lotofbench: error writing '%s'\n",
                     opt.json_out);
@@ -1043,6 +1059,29 @@ int main(int argc, char **argv)
         printf("    score       %9ld   (Integer %ld, Floating Point %ld)\n",
                composite_multi, integer_multi, floating_multi);
     }
+
+    /* Portal upload (C3): session handshake, proof of work, submit.
+     * Progress and diagnostics go to stderr; the result URL lands on
+     * stdout in text mode and on stderr in --json mode so the machine
+     * stream stays pure. */
+    if (opt.upload) {
+        upload_result upload;
+        int rc = upload_submit_with_session(upload_base_url(), &session, doc,
+                                            doc_len, &upload);
+        FILE *url_out = opt.json ? stderr : stdout;
+
+        if (rc == UPLOAD_OK) {
+            fprintf(url_out, "Result URL: %s\n", upload.result_url);
+        } else {
+            fprintf(stderr, "lotofbench: upload failed (%s)",
+                    upload_rc_name(rc));
+            if (upload.reason[0])
+                fprintf(stderr, ": %s", upload.reason);
+            fputc('\n', stderr);
+            status = 1;
+        }
+    }
+    free(doc);
 
     fc_free(fc);
     nav_free(nav);

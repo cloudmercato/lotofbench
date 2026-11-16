@@ -78,6 +78,15 @@ void test_upsys_environment(void);
 void test_upsys_names(void);
 void test_upsys_profile_capture(void);
 
+/* --- upload: portal flow ------------------------------------------------------*/
+void test_upload_json_find_string(void);
+void test_upload_json_find_uint(void);
+void test_upload_parse_session(void);
+void test_upload_build_payload(void);
+void test_upload_parse_submit_response(void);
+void test_upload_rejection_reason(void);
+void test_upload_base_url_env(void);
+
 /* --- lz4 -----------------------------------------------------------------------*/
 void test_lz4_roundtrip_shapes(void);
 void test_lz4_golden_vectors(void);
@@ -89,6 +98,7 @@ void test_lz4_small_thread_stack(void);
 void test_parse_uint_valid(void);
 void test_parse_uint_invalid(void);
 void test_parse_args_no_upload_noop(void);
+void test_parse_args_upload_flags(void);
 
 /* --- sysinfo ---------------------------------------------------------------------*/
 void test_sysinfo_sane(void);

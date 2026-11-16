@@ -10,6 +10,16 @@ CFLAGS  ?= -O2 -std=c11 -Wall -Wextra -pedantic
 FPC      = -ffp-contract=off
 LDLIBS   = -lm
 
+# WITH_CURL=1 compiles the portal upload flow (libcurl dev headers).
+# The default build stays zero-dependency: upload.c compiles to an
+# offline stub and --upload is refused at parse time. The Dockerfile
+# (and only it) passes WITH_CURL=1 so the registry image uploads by
+# default.
+ifeq ($(WITH_CURL),1)
+CFLAGS  += -DHAVE_CURL
+LDLIBS  += -lcurl
+endif
+
 SRC = src/main.c \
       src/cli.c \
       src/harness.c \
@@ -39,7 +49,8 @@ SRC = src/main.c \
       src/sha1.c \
       src/sha256.c \
       src/upload/pow.c \
-      src/upload/sysinfo.c
+      src/upload/sysinfo.c \
+      src/upload/upload.c
 HDR = src/lotofbench.h \
       src/cli.h \
       src/harness.h \
@@ -77,6 +88,7 @@ TESTS_SRC = tests/runner.c \
             tests/test_sha256.c \
             tests/test_pow.c \
             tests/test_upsysinfo.c \
+            tests/test_upload.c \
             tests/test_lz4.c \
             tests/test_harness.c \
             tests/test_cli.c \
