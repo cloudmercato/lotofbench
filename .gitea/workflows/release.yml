@@ -1,0 +1,101 @@
+name: Release gate
+
+# Release trigger chain (Anthony, 2026-11-16): a version tag vX.Y.Z pushed to
+# THIS repo (the Gitea working twin) is the only release trigger.
+#
+#   tag push (v*) -> unit tests (green gate) -> mirror the tag to GitHub
+#   -> repository_dispatch -> github.com/cloudmercato/lotofbench builds the
+#      4 binaries (linux/macos x amd64/arm64) and publishes the release.
+#
+# A red pipeline never dispatches: zero GitHub releases. Full mechanism,
+# secrets map and rehearsal evidence: docs/release.md.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-gate
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Gate — unit tests
+    runs-on: ubuntu-22.04
+    # Belt and braces: even if a platform ever fires this workflow on a
+    # non-tag push, the gate itself only makes sense on a v* tag.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: make test
+
+  publish:
+    name: Mirror tag + dispatch GitHub release build
+    needs: tests
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (full history, tags included)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard — release only from a v* tag
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF_NAME" in
+            v*) echo "release tag: $GITHUB_REF_NAME" ;;
+            *) echo "refusing to publish: this job runs only on a v* tag push (got $GITHUB_REF_NAME during $GITHUB_EVENT_NAME)" >&2; exit 1 ;;
+          esac
+
+      - name: Mirror the release tag to GitHub
+        env:
+          MIRROR_KEY: ${{ secrets.GITHUB_MIRROR_KEY }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MIRROR_KEY" ]; then
+            echo "repo secret GITHUB_MIRROR_KEY is not set — cannot mirror the tag" >&2
+            exit 1
+          fi
+          KEYDIR=$(mktemp -d)
+          umask 077
+          printf '%s\n' "$MIRROR_KEY" > "$KEYDIR/deploy_key"
+          trap 'rm -rf "$KEYDIR"' EXIT
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          GIT_SSH_COMMAND="ssh -q -i $KEYDIR/deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$PWD/.gitea/known_hosts_github -o StrictHostKeyChecking=yes" \
+            git push ssh://git@github.com/cloudmercato/lotofbench.git "refs/tags/$TAG:refs/tags/$TAG"
+          echo "tag $TAG mirrored to github.com/cloudmercato/lotofbench"
+
+      - name: Dispatch the GitHub release build
+        env:
+          GH_DISPATCH_TOKEN: ${{ secrets.GITHUB_DISPATCH_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_DISPATCH_TOKEN" ]; then
+            echo "repo secret GITHUB_DISPATCH_TOKEN is not set — cannot dispatch the release build" >&2
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/dispatch-resp.txt -w '%{http_code}' -X POST \
+            "https://api.github.com/repos/cloudmercato/lotofbench/dispatches" \
+            -H "Authorization: Bearer $GH_DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            --data "{\"event_type\":\"release-build\",\"client_payload\":{\"tag\":\"$TAG\",\"sha\":\"$SHA\"}}")
+          echo "GitHub repository_dispatch HTTP $code"
+          if [ "$code" != "204" ]; then
+            echo "dispatch failed — response body follows (no secrets in it)" >&2
+            cat /tmp/dispatch-resp.txt >&2
+            exit 1
+          fi

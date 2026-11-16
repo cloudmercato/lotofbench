@@ -126,6 +126,38 @@ it a compiler may contract float operations into FMAs and the bit-exact
 verification of the timed cycles aborts the run instead of scoring it
 (docs/benchmarks.md, "Workload 4").
 
+## Releases (prebuilt binaries)
+
+Every `vX.Y.Z` tag pushed to the source twin (the internal Gitea repo) runs
+the unit-test pipeline there first; only a **green pipeline** releases. The
+public release then appears on GitHub with four binaries and one checksum
+file:
+
+| Asset | Platform |
+|---|---|
+| `lotofbench-<version>-linux-amd64` | Linux x86_64 — static (Alpine/musl) |
+| `lotofbench-<version>-linux-arm64` | Linux aarch64 — static (Alpine/musl) |
+| `lotofbench-<version>-macos-amd64` | macOS x86_64 |
+| `lotofbench-<version>-macos-arm64` | macOS Apple silicon |
+| `lotofbench-<version>-sha256sums.txt` | SHA-256 of the four binaries |
+
+Download and verify:
+
+```sh
+VERSION=<version> OS=linux ARCH=amd64
+curl -LO "https://github.com/cloudmercato/lotofbench/releases/download/v$VERSION/lotofbench-$VERSION-$OS-$ARCH"
+curl -LO "https://github.com/cloudmercato/lotofbench/releases/download/v$VERSION/lotofbench-$VERSION-sha256sums.txt"
+sha256sum --check --ignore-missing "lotofbench-$VERSION-sha256sums.txt"
+chmod +x "lotofbench-$VERSION-$OS-$ARCH"
+```
+
+The Linux binaries are statically linked against musl (built in an Alpine
+3.20 container) and run on any Linux without runtime dependencies; the
+macOS binaries are built natively on GitHub-hosted runners (macos-14 for
+Apple silicon, macos-13 for Intel). All four compile with
+`-ffp-contract=off`, so results are bit-comparable across platforms.
+Pipeline, gate mechanism and release runbook: [docs/release.md](docs/release.md).
+
 ## Usage
 
 ```sh
