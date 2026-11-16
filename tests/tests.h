@@ -61,6 +61,11 @@ void test_rng_distribution(void);
 void test_sha1_known_vectors(void);
 void test_sha1_million_a(void);
 
+/* --- sha256 ----------------------------------------------------------------------*/
+void test_sha256_nist_vectors(void);
+void test_sha256_hex(void);
+void test_sha256_hmac_rfc4231(void);
+
 /* --- lz4 -----------------------------------------------------------------------*/
 void test_lz4_roundtrip_shapes(void);
 void test_lz4_golden_vectors(void);

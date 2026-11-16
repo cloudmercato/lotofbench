@@ -18,6 +18,10 @@ static const test_entry TESTS[] = {
     /* sha1 */
     { "sha1/rfc3174-vectors", test_sha1_known_vectors },
     { "sha1/million-a", test_sha1_million_a },
+    /* sha256 */
+    { "sha256/nist-vectors", test_sha256_nist_vectors },
+    { "sha256/hex", test_sha256_hex },
+    { "sha256/hmac-rfc4231", test_sha256_hmac_rfc4231 },
     /* lz4 */
     { "lz4/roundtrip-shapes", test_lz4_roundtrip_shapes },
     { "lz4/golden-blocks", test_lz4_golden_vectors },
