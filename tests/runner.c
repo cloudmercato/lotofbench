@@ -27,6 +27,7 @@ static const test_entry TESTS[] = {
     /* cli */
     { "cli/parse-uint-valid", test_parse_uint_valid },
     { "cli/parse-uint-invalid", test_parse_uint_invalid },
+    { "cli/parse-args-no-upload-noop", test_parse_args_no_upload_noop },
     /* sysinfo */
     { "sysinfo/sane", test_sysinfo_sane },
     { "sysinfo/repeatable", test_sysinfo_repeatable },

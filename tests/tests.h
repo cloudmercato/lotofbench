@@ -71,6 +71,7 @@ void test_lz4_small_thread_stack(void);
 /* --- cli ---------------------------------------------------------------------*/
 void test_parse_uint_valid(void);
 void test_parse_uint_invalid(void);
+void test_parse_args_no_upload_noop(void);
 
 /* --- sysinfo ---------------------------------------------------------------------*/
 void test_sysinfo_sane(void);

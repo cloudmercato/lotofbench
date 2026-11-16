@@ -18,7 +18,9 @@ typedef struct {
 int lb_parse_uint(const char *s, unsigned *out);
 
 /* Parse the driver's argv into options. Exits with status 2 on a bad or
- * incomplete flag or an invalid value, and with status 0 on --help. */
+ * incomplete flag or an invalid value, and with status 0 on --help.
+ * --no-upload is accepted as a documented no-op: results are never
+ * uploaded by the binary, posting is done by the platform play. */
 options parse_args(int argc, char **argv);
 
 #endif /* CLI_H */

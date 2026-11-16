@@ -162,7 +162,7 @@ Pipeline, gate mechanism and release runbook: [docs/release.md](docs/release.md)
 
 ```sh
 ./lotofbench [--size-mb N] [--runs N] [--threads N] [--seed N] \
-             [--json] [--json-out PATH]
+             [--json] [--json-out PATH] [--no-upload]
 ```
 
 Defaults: 100 MB corpus, 5 runs (median), one thread per online CPU.
@@ -172,7 +172,10 @@ array). `--json-out PATH` additionally stores that JSON document in a
 file while the usual text report goes to stdout. `--size-mb` sizes the
 File Compression corpus; every other workload uses fixed-size inputs
 (the map is the map, the pages are the pages) that vary only with
-`--seed`.
+`--seed`. `--no-upload` is accepted and does nothing: this binary never
+uploads results anywhere (the CloudBeast play that drives it posts them
+to the platform itself), the flag only keeps the play's invocation
+valid.
 
 Every run starts with a hardware report, printed before the tests in
 text mode and embedded as a top-level `hardware` object in the JSON

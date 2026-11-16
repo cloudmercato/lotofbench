@@ -139,7 +139,7 @@ secret); the PAT lives in Infisical `GITHUB_TOKEN` (project
 ## Gate proof (2026-11-16, rehearsal on master 42876b7)
 
 - **Positive path**: disposable tag `v1.1.0-test` pushed on the twin → gate
-  green (193/193 tests) → tag mirrored + dispatched → GitHub release
+  green (full test suite) → tag mirrored + dispatched → GitHub release
   `v1.1.0-test` published with 4 binaries + `sha256sums.txt`; `linux-arm64`
   binary executed (`--size-mb 8 --runs 1 --threads 1`) on an aarch64 host
   (QEMU, binfmt); `linux-amd64` executed natively; macOS binaries verified
