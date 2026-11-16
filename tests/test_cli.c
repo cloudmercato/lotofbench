@@ -33,3 +33,27 @@ void test_parse_uint_invalid(void)
         CHECK(lb_parse_uint(bad[i], &v) == -1);
     CHECK_U64(v, 42); /* untouched on every rejection */
 }
+
+/* The CloudBeast play (run_lotofbench.yml) always invokes the binary
+ * with --no-upload: the flag must be accepted and change nothing,
+ * since the CLI never uploads results itself. */
+void test_parse_args_no_upload_noop(void)
+{
+    char *plain[] = { "lotofbench", NULL };
+    char *flagged[] = { "lotofbench", "--no-upload", "--runs", "2",
+                        "--json", NULL };
+    options base, with_flag;
+
+    base = parse_args(1, plain);
+    with_flag = parse_args(5, flagged);
+
+    /* --no-upload changes nothing: every field matches a plain parse
+     * of the same defaults. */
+    CHECK_U64(with_flag.corpus_mb, base.corpus_mb);
+    CHECK_U64(with_flag.seed, base.seed);
+    CHECK_U64(with_flag.threads, base.threads);
+    /* The other flags on the same command line still apply. */
+    CHECK_U64(with_flag.runs, 2);
+    CHECK_U64(with_flag.json, 1);
+    CHECK(with_flag.json_out == NULL);
+}
