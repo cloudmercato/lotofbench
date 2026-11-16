@@ -153,8 +153,8 @@ chmod +x "lotofbench-$VERSION-$OS-$ARCH"
 
 The Linux binaries are statically linked against musl (built in an Alpine
 3.20 container) and run on any Linux without runtime dependencies; the
-macOS binaries are built natively on GitHub-hosted runners (macos-14 for
-Apple silicon, macos-13 for Intel). All four compile with
+macOS binaries are built on GitHub-hosted macos-15 runners (Apple silicon
+natively; Intel cross-compiled via `-arch x86_64`). All four compile with
 `-ffp-contract=off`, so results are bit-comparable across platforms.
 Pipeline, gate mechanism and release runbook: [docs/release.md](docs/release.md).
 

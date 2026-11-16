@@ -55,8 +55,8 @@ structural guarantee that the trigger chain starts at Gitea.
 |---|---|---|---|
 | `linux-amd64` | `ubuntu-24.04` hosted runner, `alpine:3.20` container (native) | gcc (musl), `CFLAGS=-O2 -std=c11 -Wall -Wextra -pedantic -static` | fully static musl binary |
 | `linux-arm64` | same, `docker run --platform linux/arm64` via QEMU (`docker/setup-qemu-action`) | same | fully static musl binary, smoke-run under emulation |
-| `macos-arm64` | `macos-14` hosted runner (Apple silicon, free for public repos) | clang, default `CFLAGS` | native |
-| `macos-amd64` | `macos-13` hosted runner (Intel) | clang, default `CFLAGS` | native |
+| `macos-arm64` | `macos-15` hosted runner (Apple silicon) | clang, default `CFLAGS` | native, full smoke |
+| `macos-amd64` | `macos-15` hosted runner (Apple silicon) | clang, `CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic -arch x86_64"` | cross-compiled; Rosetta smoke when available, else file(1) verification (documented in the run log) |
 
 `-ffp-contract=off` is **not** spelled out in the workflow steps because the
 Makefile appends it unconditionally (`FPC = -ffp-contract=off` in the compile
