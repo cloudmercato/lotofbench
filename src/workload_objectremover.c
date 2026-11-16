@@ -798,7 +798,13 @@ or_ctx *or_prepare(unsigned seed)
         if (or_process(ctx->photo[s], ctx->mask[s], &sc, &ctx->ref[s]) !=
                 0 ||
             ctx->ref[s].unknown != ctx->mpx[s] ||
-            ctx->ref[s].unknown == 0 || ctx->ref[s].coarse_fill == 0) {
+            ctx->ref[s].unknown == 0) {
+            /* coarse_fill == 0 is NOT an error: a disc rolled near the
+             * 64 px minimum erodes to nothing by the coarsest pyramid
+             * level, the top-level fill is then a well-defined no-op
+             * and the digests still pin the outcome. Only a pipeline
+             * failure, a count disagreement or an empty mask (cannot
+             * happen with the generator, kept as a guard) reject. */
             or_scratch_free(&sc);
             or_free(ctx);
             return NULL;
@@ -844,8 +850,7 @@ static int or_cycle(void *arg)
             r.unknown != ref->unknown ||
             r.coarse_fill != ref->coarse_fill ||
             r.iters != ref->iters ||
-            r.unknown == 0 || /* the mask is never empty */
-            r.coarse_fill == 0) /* the disc reaches the coarsest level */
+            r.unknown == 0) /* the mask is never empty at level 0 */
             return -1;
     }
     return 0;

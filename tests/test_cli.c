@@ -1,8 +1,13 @@
-/* LotofBench tests — the strict CLI number parser (cli.[ch]). */
+/* LotofBench tests — the CLI parser (cli.[ch]) upload flags. */
 
 #include "tests.h"
 
 #include "cli.h"
+#include "upload/upload.h"
+
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 void test_parse_uint_valid(void)
 {
@@ -35,8 +40,8 @@ void test_parse_uint_invalid(void)
 }
 
 /* The CloudBeast play (run_lotofbench.yml) always invokes the binary
- * with --no-upload: the flag must be accepted and change nothing,
- * since the CLI never uploads results itself. */
+ * with --no-upload: the flag must be accepted and force the offline
+ * contract (zero sockets) whatever the build. */
 void test_parse_args_no_upload_noop(void)
 {
     char *plain[] = { "lotofbench", NULL };
@@ -47,8 +52,7 @@ void test_parse_args_no_upload_noop(void)
     base = parse_args(1, plain);
     with_flag = parse_args(5, flagged);
 
-    /* --no-upload changes nothing: every field matches a plain parse
-     * of the same defaults. */
+    /* Every other field matches a plain parse of the same defaults. */
     CHECK_U64(with_flag.corpus_mb, base.corpus_mb);
     CHECK_U64(with_flag.seed, base.seed);
     CHECK_U64(with_flag.threads, base.threads);
@@ -56,4 +60,45 @@ void test_parse_args_no_upload_noop(void)
     CHECK_U64(with_flag.runs, 2);
     CHECK_U64(with_flag.json, 1);
     CHECK(with_flag.json_out == NULL);
+    /* --no-upload always disables the upload. */
+    CHECK_U64(with_flag.upload, 0);
+}
+
+void test_parse_args_upload_flags(void)
+{
+    char *plain[] = { "lotofbench", NULL };
+    options base;
+
+    /* The default is compile-time: upload on curl builds, offline on
+     * the zero-dependency build. */
+    base = parse_args(1, plain);
+    CHECK_U64(base.upload, UPLOAD_DEFAULT_ENABLED);
+
+#ifdef HAVE_CURL
+    char *up[] = { "lotofbench", "--upload", NULL };
+
+    CHECK_U64(parse_args(2, up).upload, 1);
+#else
+    /* --upload on a build without libcurl refuses loudly (exit 2);
+     * the child's expected diagnostic is silenced. */
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        int devnull = open("/dev/null", O_WRONLY);
+
+        if (devnull >= 0) {
+            dup2(devnull, 2);
+            close(devnull);
+        }
+        char *up[] = { (char *)"lotofbench", (char *)"--upload" };
+
+        parse_args(2, up);
+        _exit(0); /* not reached: parse_args exits 2 */
+    }
+    int st = 0;
+
+    waitpid(pid, &st, 0);
+    CHECK(WIFEXITED(st));
+    CHECK_U64(WEXITSTATUS(st), 2);
+#endif
 }

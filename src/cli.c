@@ -21,6 +21,7 @@
 #include <unistd.h>
 
 #include "lotofbench.h"
+#include "upload/upload.h"
 
 int lb_parse_uint(const char *s, unsigned *out)
 {
@@ -48,7 +49,8 @@ static void usage(FILE *out)
 {
     fprintf(out,
             "usage: lotofbench [--size-mb N] [--runs N] [--threads N] "
-            "[--seed N] [--json] [--json-out PATH] [--no-upload]\n");
+            "[--seed N] [--json] [--json-out PATH] "
+            "[--upload | --no-upload]\n");
 }
 
 /* One numeric flag value: parse strictly or exit(2) with a diagnostic. */
@@ -70,7 +72,7 @@ static unsigned parse_uint_arg(const char *flag, const char *value)
 options parse_args(int argc, char **argv)
 {
     options o = { DEFAULT_CORPUS_MB, DEFAULT_RUNS, DEFAULT_SEED, 0, 0,
-              NULL };
+              NULL, UPLOAD_DEFAULT_ENABLED };
     long nproc = sysconf(_SC_NPROCESSORS_ONLN);
 
     if (nproc < 1)
@@ -100,12 +102,23 @@ options parse_args(int argc, char **argv)
             o.json = 1;
         } else if (!strcmp(argv[i], "--json-out") && i + 1 < argc) {
             o.json_out = argv[++i];
+        } else if (!strcmp(argv[i], "--upload")) {
+#ifdef HAVE_CURL
+            o.upload = 1;
+#else
+            fprintf(stderr,
+                    "lotofbench: --upload: this binary was built without "
+                    "libcurl support\n");
+            usage(stderr);
+            exit(2);
+#endif
         } else if (!strcmp(argv[i], "--no-upload")) {
-            /* Forward compatibility only: the CloudBeast play
-             * (cs_web/player/playbooks/run_lotofbench.yml) always
-             * passes --no-upload. The binary itself never uploads
-             * anything (posting results is done by the platform
-             * play), so the flag is a documented no-op. */
+            /* Short-circuit everything network: no session handshake,
+             * no proof of work, no submit. The offline contract
+             * (zero sockets) and the CloudBeast play
+             * (cs_web/player/playbooks/run_lotofbench.yml) both rely
+             * on it. */
+            o.upload = 0;
         } else if (!strcmp(argv[i], "--help")) {
             usage(stdout);
             exit(0);

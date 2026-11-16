@@ -567,10 +567,12 @@ synthetic photo and a planted lasso standing in for the real capture:
   excluded at every level. Fixed `--seed` means byte-identical photos
   on every machine; generation is off the clock.
 - **Ground truth**: the mask is exactly the exposed disc ∪ rectangle
-  (shapes and exact pixel counts through accessors); every disc is big
-  enough to leave fully-masked 64x64 blocks at the coarsest pyramid
-  level, so the coarsest-level fallback always fires (coarse_fill >= 1
-  on the whole corpus — a degeneracy guard).
+  (shapes and exact pixel counts through accessors). Discs rolled near
+  the 64 px minimum can be fully eroded by the push downsampling —
+  the coarsest plane then has no unknown cells and the coarsest-level
+  fallback fills none of them (`coarse_fill` 0): a well-defined no-op,
+  not an error. Larger discs leave fully-masked blocks at the
+  coarsest level and the fallback fires (`coarse_fill >= 1`).
 - **The pipeline** (per photo, inside the timed section): a 6-level
   push-pull pyramid — push: every coarse cell is the half-up mean of
   its DISTINCT known children (mask byte == 0, the clamped corner taps
@@ -590,8 +592,10 @@ synthetic photo and a planted lasso standing in for the real capture:
   photo and checks the SHA-1 of the mask and of the filled frame
   against prepare-time references, plus three exact counters (masked
   pixels, coarsest-level filled cells, Gauss-Seidel sweeps — 24 x 6
-  levels = 144 per photo), with the degeneracy guards unknown >= 1 and
-  coarse_fill >= 1. Any drift aborts the run instead of scoring.
+  levels = 144 per photo), with the degeneracy guard unknown >= 1
+  (the mask is never empty at level 0); `coarse_fill` is compared
+  exactly, 0 included (eroded minimum-radius disc, see ground truth
+  above). Any drift aborts the run instead of scoring.
 - **Cycle**: one run = the four photos through the full fill, timed as
   a whole with `CLOCK_MONOTONIC`, reported as millions of filled
   output pixels per second (baseline 30.0 Mpixel/s = 1000 points).

@@ -10,6 +10,22 @@ CFLAGS  ?= -O2 -std=c11 -Wall -Wextra -pedantic
 FPC      = -ffp-contract=off
 LDLIBS   = -lm
 
+# WITH_CURL=1 compiles the portal upload flow (libcurl dev headers).
+# The default build stays zero-dependency: upload.c compiles to an
+# offline stub and --upload is refused at parse time. The Dockerfile
+# (and only it) passes WITH_CURL=1 so the registry image uploads by
+# default.
+ifeq ($(WITH_CURL),1)
+# override: the appends must survive a command-line CFLAGS/LDLIBS (the
+# Dockerfile passes CFLAGS for the static link; without override the
+# -DHAVE_CURL append would silently lose the GNU-make precedence war).
+override CFLAGS  += -DHAVE_CURL
+# CURL_STATIC_LIBS: the extra -l* needed to link libcurl.a's own
+# dependency closure when the whole binary is static (-static, musl);
+# empty for normal dynamic builds (libcurl.so carries its own deps).
+override LDLIBS  += -lcurl $(CURL_STATIC_LIBS)
+endif
+
 SRC = src/main.c \
       src/cli.c \
       src/harness.c \
@@ -36,7 +52,11 @@ SRC = src/main.c \
       src/workload_hdr.c \
       src/imgops.c \
       src/lz4.c \
-      src/sha1.c
+      src/sha1.c \
+      src/sha256.c \
+      src/upload/pow.c \
+      src/upload/sysinfo.c \
+      src/upload/upload.c
 HDR = src/lotofbench.h \
       src/cli.h \
       src/harness.h \
@@ -63,12 +83,18 @@ HDR = src/lotofbench.h \
       src/workload_hdr.h \
       src/imgops.h \
       src/lz4.h \
-      src/sha1.h
+      src/sha1.h \
+      src/sha256.h \
+      src/upload/pow.h \
 
 TESTS_SRC = tests/runner.c \
             tests/test_util.c \
             tests/test_rng.c \
             tests/test_sha1.c \
+            tests/test_sha256.c \
+            tests/test_pow.c \
+            tests/test_upsysinfo.c \
+            tests/test_upload.c \
             tests/test_lz4.c \
             tests/test_harness.c \
             tests/test_cli.c \

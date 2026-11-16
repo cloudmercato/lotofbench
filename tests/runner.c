@@ -18,6 +18,28 @@ static const test_entry TESTS[] = {
     /* sha1 */
     { "sha1/rfc3174-vectors", test_sha1_known_vectors },
     { "sha1/million-a", test_sha1_million_a },
+    /* sha256 */
+    { "sha256/nist-vectors", test_sha256_nist_vectors },
+    { "sha256/hex", test_sha256_hex },
+    { "sha256/hmac-rfc4231", test_sha256_hmac_rfc4231 },
+    /* upload — proof of work */
+    { "pow/leading-zero-bits", test_pow_leading_zero_bits },
+    { "pow/solve-difficulty-8", test_pow_solve_small },
+    { "pow/solve-progress", test_pow_solve_progress },
+    { "pow/rejects-absurd", test_pow_rejects_absurd },
+    /* upload — system profile */
+    { "upsysinfo/cpuinfo-hypervisor", test_upsys_cpuinfo_hypervisor },
+    { "upsysinfo/environment-detection", test_upsys_environment },
+    { "upsysinfo/environment-names", test_upsys_names },
+    { "upsysinfo/profile-capture", test_upsys_profile_capture },
+    /* upload — portal flow */
+    { "upload/json-find-string", test_upload_json_find_string },
+    { "upload/json-find-uint", test_upload_json_find_uint },
+    { "upload/parse-session", test_upload_parse_session },
+    { "upload/build-payload", test_upload_build_payload },
+    { "upload/parse-submit-response", test_upload_parse_submit_response },
+    { "upload/rejection-reason", test_upload_rejection_reason },
+    { "upload/base-url-env", test_upload_base_url_env },
     /* lz4 */
     { "lz4/roundtrip-shapes", test_lz4_roundtrip_shapes },
     { "lz4/golden-blocks", test_lz4_golden_vectors },
@@ -28,6 +50,7 @@ static const test_entry TESTS[] = {
     { "cli/parse-uint-valid", test_parse_uint_valid },
     { "cli/parse-uint-invalid", test_parse_uint_invalid },
     { "cli/parse-args-no-upload-noop", test_parse_args_no_upload_noop },
+    { "cli/parse-args-upload-flags", test_parse_args_upload_flags },
     /* sysinfo */
     { "sysinfo/sane", test_sysinfo_sane },
     { "sysinfo/repeatable", test_sysinfo_repeatable },
