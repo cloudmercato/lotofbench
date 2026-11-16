@@ -95,8 +95,8 @@ https://github.com/cloudmercato/lotofbench/releases/download/v<version>/lotofben
 
 | Secret | Set where | Value (never printed/committed) | Used by |
 |---|---|---|---|
-| `GITHUB_MIRROR_KEY` | Gitea repo secrets, `cloud-mercato/lotofbench` | private key of the GitHub deploy key `id_ed25519_github_lotofbench` (same key the on-demand sync script uses; lives in the gitea container at `/data/git/.ssh/`) | gate job: `git push` the release tag to GitHub over SSH |
-| `GITHUB_DISPATCH_TOKEN` | Gitea repo secrets, `cloud-mercato/lotofbench` | GitHub PAT (Infisical, project `cloud-transparency-platform`, key `GITHUB_TOKEN`) with `contents` access to `cloudmercato/lotofbench` | gate job: `POST /repos/cloudmercato/lotofbench/dispatches` |
+| `GH_MIRROR_KEY` | Gitea repo secrets, `cloud-mercato/lotofbench` | private key of the GitHub deploy key `id_ed25519_github_lotofbench` (same key the on-demand sync script uses; lives in the gitea container at `/data/git/.ssh/`) | gate job: `git push` the release tag to GitHub over SSH |
+| `GH_DISPATCH_TOKEN` | Gitea repo secrets, `cloud-mercato/lotofbench` | GitHub PAT (Infisical, project `cloud-transparency-platform`, key `GITHUB_TOKEN`) with `contents` access to `cloudmercato/lotofbench` | gate job: `POST /repos/cloudmercato/lotofbench/dispatches` |
 | `GITHUB_TOKEN` | built-in | n/a — Actions-issued, `permissions: contents: write` | release job: `gh release create` |
 
 Host-key pinning: `.gitea/known_hosts_github` (committed, public data —
@@ -130,10 +130,10 @@ tag is a no-op).
 
 **Rotate credentials** — the deploy key is shared with the on-demand sync
 script (rotate it in the gitea container `/data/git/.ssh/` and on GitHub →
-repo → Settings → Deploy keys, then refresh the `GITHUB_MIRROR_KEY` Gitea
+repo → Settings → Deploy keys, then refresh the `GH_MIRROR_KEY` Gitea
 secret); the PAT lives in Infisical `GITHUB_TOKEN` (project
 `cloud-transparency-platform`) — rotate it there and refresh
-`GITHUB_DISPATCH_TOKEN`. Gitea repo secrets:
+`GH_DISPATCH_TOKEN`. Gitea repo secrets:
 `PUT /api/v1/repos/cloud-mercato/lotofbench/actions/secrets/<NAME>`.
 
 ## Gate proof (2026-11-16, rehearsal on master 42876b7)

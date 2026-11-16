@@ -59,12 +59,12 @@ jobs:
 
       - name: Mirror the release tag to GitHub
         env:
-          MIRROR_KEY: ${{ secrets.GITHUB_MIRROR_KEY }}
+          MIRROR_KEY: ${{ secrets.GH_MIRROR_KEY }}
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           if [ -z "$MIRROR_KEY" ]; then
-            echo "repo secret GITHUB_MIRROR_KEY is not set — cannot mirror the tag" >&2
+            echo "repo secret GH_MIRROR_KEY is not set — cannot mirror the tag" >&2
             exit 1
           fi
           KEYDIR=$(mktemp -d)
@@ -78,13 +78,13 @@ jobs:
 
       - name: Dispatch the GitHub release build
         env:
-          GH_DISPATCH_TOKEN: ${{ secrets.GITHUB_DISPATCH_TOKEN }}
+          GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
           TAG: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           if [ -z "$GH_DISPATCH_TOKEN" ]; then
-            echo "repo secret GITHUB_DISPATCH_TOKEN is not set — cannot dispatch the release build" >&2
+            echo "repo secret GH_DISPATCH_TOKEN is not set — cannot dispatch the release build" >&2
             exit 1
           fi
           code=$(curl -sS -o /tmp/dispatch-resp.txt -w '%{http_code}' -X POST \
