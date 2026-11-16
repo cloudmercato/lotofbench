@@ -117,9 +117,10 @@ Then watch the "Release gate" run on Gitea; on green, the "Release build" run
 starts on GitHub and the release appears with 5 assets.
 
 **Re-run a failed gate after a fix** — push a new tag (recommended), or
-dispatch the gate workflow manually from the Gitea UI (it re-tests the same
-commit; note the tag mirror step is idempotent, `git push` of an identical
-tag is a no-op).
+dispatch the gate workflow manually from the Gitea UI to re-test the same
+commit. Note: a manual dispatch only runs the tests job — the publish job's
+guard refuses non-tag refs, so it never mirrors or dispatches; publishing
+always requires a real `v*` tag push.
 
 **Re-run a failed GitHub build without touching Gitea** —
 `gh workflow run release.yml -R cloudmercato/lotofbench -f tag=v1.2.3`
@@ -136,17 +137,49 @@ secret); the PAT lives in Infisical `GITHUB_TOKEN` (project
 `GH_DISPATCH_TOKEN`. Gitea repo secrets:
 `PUT /api/v1/repos/cloud-mercato/lotofbench/actions/secrets/<NAME>`.
 
-## Gate proof (2026-11-16, rehearsal on master 42876b7)
+## Gate proof (2026-11-16, rehearsals on master `a113a31`)
 
-- **Positive path**: disposable tag `v1.1.0-test` pushed on the twin → gate
-  green (full test suite) → tag mirrored + dispatched → GitHub release
-  `v1.1.0-test` published with 4 binaries + `sha256sums.txt`; `linux-arm64`
-  binary executed (`--size-mb 8 --runs 1 --threads 1`) on an aarch64 host
-  (QEMU, binfmt); `linux-amd64` executed natively; macOS binaries verified
-  via the GitHub runner smoke logs (no mac host on the LAN — noted
-  limitation, runners are the build hosts themselves). Disposable tag and
-  rehearsal release deleted afterwards.
-- **Negative path**: tag `v1.1.0-gate-red` pushed on a branch whose tests
-  deliberately fail → gate red → **no dispatch, zero GitHub releases, zero
-  GitHub workflow runs** for that tag. Disposable branch and tag deleted
-  afterwards.
+### Positive path — rehearsal tag `v1.1.0-test`
+
+- Tag pushed on the twin at master `a113a31` (includes `--no-upload` no-op
+  flag, PR #25) → gate green (unit tests + mirror + dispatch, 2/2 jobs) →
+  GitHub `Release build` run 43805160846 → **all six jobs green** and the
+  release published: <https://github.com/cloudmercato/lotofbench/releases/tag/v1.1.0-test>
+  with the 5 contract-named assets (4 binaries + `sha256sums.txt`, 400 B).
+- **Checksums**: all 4 assets downloaded through the exact stable URL pattern
+  (`releases/download/v1.1.0-test/lotofbench-1.1.0-test-<os>-<arch>`),
+  `sha256sum --check --ignore-missing` → 4/4 OK. `file(1)` confirms each
+  binary's claimed platform (2 × static ELF, 2 × Mach-O).
+- **Execution proof per target**:
+  - linux/amd64 — smoke on the runner + play-shape invocation
+    (`--no-upload --runs 1 --size-mb 1 --json-out`) executed locally: exit 0,
+    valid schema-1 JSON (16 workloads, composite 528/2614). This is the D2
+    contract (`run_lotofbench.yml` invocation) proven on the released asset.
+  - linux/arm64 — full-suite smoke on the runner (QEMU) + play-shape
+    execution on an aarch64 host via QEMU binfmt: exit 0, real scores.
+  - macos/arm64 — full-suite smoke on the `macos-15` runner (native): exit 0,
+    real scores in the job log.
+  - macos/amd64 — cross-compiled `-arch x86_64` on `macos-15`, then executed
+    under Rosetta 2 on the runner: exit 0, real x86_64 scores in the job log
+    (the file(1) fallback documented below was not needed).
+- The `v1.1.0-test` release is kept as the D2-usable asset set (its CLI knows
+  `--no-upload`) until the first real release; delete it then.
+
+### Negative path — tag `v1.1.0-gate-red` (disposable branch `ci/gate-red-test`)
+
+- Branch with a deliberately failing test suite (`test_failure_count()`
+  forced to 1), tagged `v1.1.0-gate-red` and pushed to the twin.
+- Result on the twin: `Release gate / Gate — unit tests` = **failure**,
+  `Release gate / Mirror tag + dispatch` = **skipped** (`needs:` gate held).
+- Result on GitHub: **no release** for the tag (404), the tag was never
+  mirrored (tags list still only `v1.1.0-test`), no new `Release build` run.
+- Disposable branch and tag deleted afterwards.
+
+### Runner notes (kept for the next release owner)
+
+- `macos-14` arm64 is not provisionable for this account ("runner config
+  macos-14-arm64-us-default not supported") and `macos-13` (Intel) sits
+  queued — both macOS legs run on `macos-15` (PR #26).
+- macOS amd64 is cross-compiled with `-arch x86_64` and smoke-executed under
+  Rosetta 2; if Rosetta is ever unavailable on the runner, the step falls
+  back to `file(1)` verification and says so in the log.
