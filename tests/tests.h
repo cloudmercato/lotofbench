@@ -72,6 +72,12 @@ void test_pow_solve_small(void);
 void test_pow_solve_progress(void);
 void test_pow_rejects_absurd(void);
 
+/* --- upload: system profile ------------------------------------------------------*/
+void test_upsys_cpuinfo_hypervisor(void);
+void test_upsys_environment(void);
+void test_upsys_names(void);
+void test_upsys_profile_capture(void);
+
 /* --- lz4 -----------------------------------------------------------------------*/
 void test_lz4_roundtrip_shapes(void);
 void test_lz4_golden_vectors(void);

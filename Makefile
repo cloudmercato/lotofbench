@@ -38,7 +38,8 @@ SRC = src/main.c \
       src/lz4.c \
       src/sha1.c \
       src/sha256.c \
-      src/upload/pow.c
+      src/upload/pow.c \
+      src/upload/sysinfo.c
 HDR = src/lotofbench.h \
       src/cli.h \
       src/harness.h \
@@ -75,6 +76,7 @@ TESTS_SRC = tests/runner.c \
             tests/test_sha1.c \
             tests/test_sha256.c \
             tests/test_pow.c \
+            tests/test_upsysinfo.c \
             tests/test_lz4.c \
             tests/test_harness.c \
             tests/test_cli.c \

@@ -6,9 +6,17 @@
  * lives in workload_*.c; the shared-task threading and timing in
  * harness.c; the CLI in cli.c; this file owns the output. */
 
+#define _POSIX_C_SOURCE 200809L
+/* macOS gates clock_gettime/open_memstream-era POSIX bits the same way
+ * sysinfo.c and cli.c do: re-expose the Darwin extensions. */
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE 200809L
+#endif
+
 #include "cli.h"
 #include "harness.h"
 #include "sysinfo.h"
+#include "upload/sysinfo.h"
 #include "lotofbench.h"
 #include "workload_assetcompression.h"
 #include "workload_backgroundblur.h"
@@ -30,6 +38,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* --- running the suite ------------------------------------------------------*/
 
@@ -309,6 +318,8 @@ static void json_puts(FILE *out, const char *s)
 
 static void print_json(FILE *out, const options *opt,
                        const lb_sysinfo *sys,
+                       const lb_system_profile *sys_env,
+                       double runtime_seconds,
                        const lb_result *fc_single,
                        const lb_result *fc_multi,
                        const lb_result *nav_single,
@@ -359,6 +370,8 @@ static void print_json(FILE *out, const options *opt,
             "  \"seed\": %u,\n", opt->seed);
     fprintf(out,
             "  \"runs\": %u,\n", opt->runs);
+    fprintf(out,
+            "  \"runtime_seconds\": %.1f,\n", runtime_seconds);
     fprintf(out,
             "  \"hardware\": {\n");
     fprintf(out,
@@ -417,6 +430,29 @@ static void print_json(FILE *out, const options *opt,
             "      \"map\": "); json_puts(out, sys->numa_map); fprintf(out, "\n");
     fprintf(out,
             "    }\n");
+    fprintf(out,
+            "  },\n");
+    fprintf(out,
+            "  \"system\": {\n");
+    fprintf(out,
+            "    \"os\": "); json_puts(out, sys_env->os); fprintf(out, ",\n");
+    fprintf(out,
+            "    \"arch\": "); json_puts(out, sys_env->arch); fprintf(out, ",\n");
+    fprintf(out,
+            "    \"cpu_model\": "); json_puts(out, sys_env->cpu_model);
+    fprintf(out,
+            ",\n");
+    fprintf(out,
+            "    \"cores\": %u,\n", sys_env->cores);
+    fprintf(out,
+            "    \"ram_mb\": %llu,\n", (unsigned long long)sys_env->ram_mb);
+    fprintf(out,
+            "    \"environment\": \"%s\",\n",
+            lb_environment_name(sys_env->environment));
+    fprintf(out,
+            "    \"virtualization\": "); json_puts(out, sys_env->virtualization);
+    fprintf(out,
+            "\n");
     fprintf(out,
             "  },\n");
     fprintf(out,
@@ -679,6 +715,10 @@ int main(int argc, char **argv)
      * mode) and lands in the JSON document. */
     lb_sysinfo sys;
     lb_sysinfo_capture(&sys);
+    /* Upload-facing system profile: flat fields plus the execution
+     * environment (container → vm → bare-metal), probed off the clock. */
+    lb_system_profile profile;
+    lb_system_profile_capture(&profile, &sys);
     if (!opt.json) {
         printf("LotofBench %s\n", LOTOFBENCH_VERSION);
         printf("seed %u, %u runs, median\n\n", opt.seed, opt.runs);
@@ -750,6 +790,11 @@ int main(int argc, char **argv)
              hd_pixels = 0, pf_pixels = 0, hdr_pixels = 0, rt_rays = 0,
              sfm_pairs = 0;
 
+    /* The clock covers exactly the single- and multi-core passes:
+     * runtime_seconds is the document field the portal floors and
+     * cross-checks against the session age. */
+    struct timespec ts_start, ts_end;
+    clock_gettime(CLOCK_MONOTONIC, &ts_start);
     if (run_fc(fc, opt.runs, 1, &fc_single) != 0 ||
         run_fc(fc, opt.runs, opt.threads, &fc_multi) != 0 ||
         run_nav(nav, opt.runs, 1, &nav_single, &nav_ops) != 0 ||
@@ -806,6 +851,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    double runtime_seconds =
+        (double)(ts_end.tv_sec - ts_start.tv_sec) +
+        (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1e9;
+    if (runtime_seconds < 0.0)
+        runtime_seconds = 0.0;
+
     /* Composite scoring (docs/benchmarks.md "Scoring"): the section
      * scores are the geometric means of their member workloads' scores
      * and the composite the 65/35 weighted arithmetic mean of the two
@@ -838,7 +890,8 @@ int main(int argc, char **argv)
     long composite_multi = lb_composite(integer_multi, floating_multi);
 
     if (opt.json) {
-        print_json(stdout, &opt, &sys, &fc_single, &fc_multi, &nav_single,
+        print_json(stdout, &opt, &sys, &profile,
+                   runtime_seconds, &fc_single, &fc_multi, &nav_single,
                    &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
                    html5_elements(h5), &pdf_single, &pdf_multi,
                    pdf_pixels, &pl_single, &pl_multi, pl_photos,
@@ -857,7 +910,8 @@ int main(int argc, char **argv)
                    composite_multi);
     }
     if (json_out) {
-        print_json(json_out, &opt, &sys, &fc_single, &fc_multi, &nav_single,
+        print_json(json_out, &opt, &sys, &profile,
+                   runtime_seconds, &fc_single, &fc_multi, &nav_single,
                    &nav_multi, nav_ops, &h5_single, &h5_multi, h5_pages,
                    html5_elements(h5), &pdf_single, &pdf_multi,
                    pdf_pixels, &pl_single, &pl_multi, pl_photos,

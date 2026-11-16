@@ -27,6 +27,11 @@ static const test_entry TESTS[] = {
     { "pow/solve-difficulty-8", test_pow_solve_small },
     { "pow/solve-progress", test_pow_solve_progress },
     { "pow/rejects-absurd", test_pow_rejects_absurd },
+    /* upload — system profile */
+    { "upsysinfo/cpuinfo-hypervisor", test_upsys_cpuinfo_hypervisor },
+    { "upsysinfo/environment-detection", test_upsys_environment },
+    { "upsysinfo/environment-names", test_upsys_names },
+    { "upsysinfo/profile-capture", test_upsys_profile_capture },
     /* lz4 */
     { "lz4/roundtrip-shapes", test_lz4_roundtrip_shapes },
     { "lz4/golden-blocks", test_lz4_golden_vectors },
