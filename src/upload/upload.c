@@ -180,11 +180,54 @@ static void site_root(const char *base, char *out, size_t cap)
     out[len] = '\0';
 }
 
+/* 1 when `url` already carries a scheme ("<scheme>://"), 0 otherwise
+ * (RFC 3986 scheme: ALPHA, then ALPHA / DIGIT / "+" / "-" / "."). */
+static int url_is_absolute(const char *url)
+{
+    size_t i;
+    char c;
+
+    if (!((url[0] >= 'a' && url[0] <= 'z') ||
+          (url[0] >= 'A' && url[0] <= 'Z')))
+        return 0;
+    for (i = 1; url[i]; i++) {
+        c = url[i];
+        if (c == ':')
+            return url[i + 1] == '/' && url[i + 2] == '/';
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '+' || c == '-' ||
+              c == '.'))
+            return 0;
+    }
+    return 0;
+}
+
+/* The human-facing result URL: the site-relative `result_url` the
+ * portal now includes in the 201 body (plan v2.1 §C3 — the real WS-B
+ * detail page), joined to the site root; an absolute `result_url` is
+ * taken as-is. Returns 0 when the full URL fits, -1 otherwise —
+ * `out` is only written on success. */
+static int join_result_url(char *out, size_t cap, const char *site,
+                           const char *url)
+{
+    size_t site_len = strlen(site);
+    size_t url_len = strlen(url);
+
+    if (url_is_absolute(url))
+        site_len = 0;
+    if (site_len + url_len + 1 > cap)
+        return -1;
+    memcpy(out, site, site_len);
+    memcpy(out + site_len, url, url_len + 1);
+    return 0;
+}
+
 int upload_parse_submit_response(const char *body, const char *base_url,
                                  upload_result *out)
 {
     unsigned long long id;
     char site[UPLOAD_RESULT_URL_MAX];
+    char url[UPLOAD_RESULT_URL_MAX];
 
     memset(out, 0, sizeof *out);
     if (upload_json_find_uint(body, "id", &id) != 0)
@@ -194,6 +237,13 @@ int upload_parse_submit_response(const char *body, const char *base_url,
         return -1;
     out->result_id = id;
     site_root(base_url, site, sizeof site);
+    if (upload_json_find_string(body, "result_url", url, sizeof url) == 0 &&
+        url[0] != '\0' &&
+        join_result_url(out->result_url, sizeof out->result_url, site,
+                        url) == 0)
+        return 0;
+    /* No usable `result_url` in the body (older portal, empty or
+     * oversized value): the legacy client-side fallback. */
     if (snprintf(out->result_url, sizeof out->result_url, "%s/result/%llu/",
                  site, id) >= (int)sizeof out->result_url)
         return -1;

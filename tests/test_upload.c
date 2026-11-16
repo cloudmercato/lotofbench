@@ -8,6 +8,7 @@
 
 #include "upload/upload.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -112,6 +113,8 @@ void test_upload_build_payload(void)
 void test_upload_parse_submit_response(void)
 {
     upload_result r;
+    char body[640];
+    char big[2 * UPLOAD_RESULT_URL_MAX];
 
     CHECK_U64(upload_parse_submit_response(
                   "{\"id\": 42, \"status\": \"verified\", "
@@ -130,6 +133,47 @@ void test_upload_parse_submit_response(void)
                                            &r),
               0);
     CHECK_STR(r.result_url, "http://localhost:19187/result/7/");
+
+    /* the portal-provided result_url wins: a site-relative path is
+     * joined to the site root (plan v2.1 §C3 — the real WS-B page) */
+    CHECK_U64(upload_parse_submit_response(
+                  "{\"id\": 42, \"status\": \"verified\", "
+                  "\"result_url\": \"/results/custom:42/\"}",
+                  "https://lotofbench.cloud-mercato.com/api/v1/", &r),
+              0);
+    CHECK_STR(r.result_url,
+              "https://lotofbench.cloud-mercato.com/results/custom:42/");
+
+    /* an absolute result_url is taken as-is, from a custom base */
+    CHECK_U64(upload_parse_submit_response(
+                  "{\"id\": 42, \"status\": \"verified\", \"result_url\": "
+                  "\"https://other.example.net/results/x/\"}",
+                  "http://localhost:19187/api/v1/", &r),
+              0);
+    CHECK_STR(r.result_url, "https://other.example.net/results/x/");
+
+    /* an empty result_url: the legacy fallback */
+    CHECK_U64(upload_parse_submit_response(
+                  "{\"id\": 9, \"status\": \"verified\", "
+                  "\"result_url\": \"\"}",
+                  "http://localhost:19187/api/v1/", &r),
+              0);
+    CHECK_STR(r.result_url, "http://localhost:19187/result/9/");
+
+    /* a result_url too long for the field: the legacy fallback */
+    memset(big, 'x', sizeof big - 1);
+    big[0] = '/';
+    big[sizeof big - 2] = '/';
+    big[sizeof big - 1] = '\0';
+    snprintf(body, sizeof body,
+             "{\"id\": 11, \"status\": \"verified\", "
+             "\"result_url\": \"%s\"}",
+             big);
+    CHECK_U64(upload_parse_submit_response(body,
+                                           "http://localhost:19187/api/v1/",
+                                           &r),
+              0);
+    CHECK_STR(r.result_url, "http://localhost:19187/result/11/");
 
     /* malformed body */
     CHECK_U64(upload_parse_submit_response("{\"status\": \"verified\"}",
