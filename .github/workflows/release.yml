@@ -1,0 +1,199 @@
+name: Release build
+
+# Public release pipeline for github.com/cloudmercato/lotofbench.
+#
+# Triggered ONLY by a repository_dispatch sent by the source twin
+# (gitea: cloud-mercato/lotofbench) AFTER its unit-test gate is green on a
+# v* tag push — or manually (workflow_dispatch) as a re-run fallback.
+# A direct tag push on GitHub builds nothing by design: the release trigger
+# always originates from Gitea (Anthony, 2026-11-16).
+#
+# On the Gitea twin this file is inert (Gitea never sends repository_dispatch
+# here); do not workflow_dispatch it from the Gitea web UI — the preflight
+# job will refuse. Mechanism and evidence: docs/release.md.
+
+on:
+  repository_dispatch:
+    types: [release-build]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build (vX.Y.Z), must already exist on this repo'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.client_payload.tag || github.event.inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
+
+jobs:
+  preflight:
+    name: Platform guard + event sanity
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: GitHub only
+        run: |
+          set -euo pipefail
+          case "${{ github.server_url }}" in
+            *github.com*) echo "running on GitHub — ok" ;;
+            *) echo "refusing to run: this workflow belongs to github.com/cloudmercato/lotofbench, not ${{ github.server_url }}" >&2; exit 1 ;;
+          esac
+
+      - name: Tag sanity
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            v*) echo "release tag: $TAG" ;;
+            *) echo "missing or malformed tag payload: '$TAG'" >&2; exit 1 ;;
+          esac
+
+  build:
+    name: build ${{ matrix.target }}
+    needs: preflight
+    runs-on: ${{ matrix.runs_on }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-amd64, runs_on: ubuntu-24.04, platform: linux/amd64, builder: container }
+          - { target: linux-arm64, runs_on: ubuntu-24.04, platform: linux/arm64, builder: container }
+          - { target: macos-arm64, runs_on: macos-14,     platform: '',         builder: native }
+          - { target: macos-amd64, runs_on: macos-13,     platform: '',         builder: native }
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - name: Verify the tag matches the dispatched commit
+        run: |
+          set -euo pipefail
+          dispatched="${{ github.event.client_payload.sha }}"
+          got="$(git rev-parse "${TAG}^{commit}")"
+          echo "tag $TAG -> commit $got (dispatched: ${dispatched:-<manual run>})"
+          if [ -n "$dispatched" ] && [ "$got" != "$dispatched" ]; then
+            echo "tag/commit mismatch — refusing to build" >&2
+            exit 1
+          fi
+
+      - name: Set up QEMU (arm64 emulation)
+        if: matrix.target == 'linux-arm64'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build (linux — alpine/musl, static; FPC comes from the Makefile)
+        if: matrix.builder == 'container'
+        run: |
+          set -euo pipefail
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src alpine:3.20 sh -c '
+            apk add --no-cache build-base >/dev/null &&
+            make CC=gcc CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic -static" lotofbench'
+
+      - name: Build (macOS — native clang on the hosted runner)
+        if: matrix.builder == 'native'
+        run: |
+          set -euo pipefail
+          make CC=clang lotofbench
+
+      - name: Stage release asset
+        id: stage
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          ASSET="lotofbench-${VERSION}-${{ matrix.target }}"
+          mkdir -p out
+          cp lotofbench "out/$ASSET"
+          file "out/$ASSET"
+          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke — full suite, tiny corpus (--size-mb 8 --runs 1 --threads 1)
+        run: |
+          set -euo pipefail
+          ASSET="${{ steps.stage.outputs.asset }}"
+          if [ "${{ matrix.builder }}" = "container" ]; then
+            docker run --rm --platform ${{ matrix.platform }} -v "$PWD/out":/out alpine:3.20 \
+              "/out/$ASSET" --size-mb 8 --runs 1 --threads 1
+          else
+            "./out/$ASSET" --size-mb 8 --runs 1 --threads 1
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-${{ matrix.target }}
+          path: out/
+
+  release:
+    name: Checksums + GitHub release
+    needs: build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the release tag (provenance)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: asset-*
+          path: out
+          merge-multiple: true
+
+      - name: Generate sha256sums (4 binaries)
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          ls -l out/
+          cd out
+          sha256sum "lotofbench-$VERSION-linux-amd64" \
+                    "lotofbench-$VERSION-linux-arm64" \
+                    "lotofbench-$VERSION-macos-amd64" \
+                    "lotofbench-$VERSION-macos-arm64" \
+                    > "lotofbench-$VERSION-sha256sums.txt"
+          cat "lotofbench-$VERSION-sha256sums.txt"
+
+      - name: Create the GitHub release
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          COMMIT="$(git rev-parse HEAD)"
+          {
+            echo "LotofBench $VERSION — prebuilt binaries for four targets."
+            echo
+            echo "| Asset | Platform |"
+            echo "|---|---|"
+            echo "| \`lotofbench-$VERSION-linux-amd64\` | Linux x86_64 — static (Alpine/musl) |"
+            echo "| \`lotofbench-$VERSION-linux-arm64\` | Linux aarch64 — static (Alpine/musl) |"
+            echo "| \`lotofbench-$VERSION-macos-amd64\` | macOS x86_64 (built on macos-13) |"
+            echo "| \`lotofbench-$VERSION-macos-arm64\` | macOS Apple silicon (built on macos-14) |"
+            echo
+            echo "Verify the download:"
+            echo
+            echo "\`\`\`sh"
+            echo "curl -LO https://github.com/cloudmercato/lotofbench/releases/download/$TAG/lotofbench-$VERSION-sha256sums.txt"
+            echo "sha256sum --check --ignore-missing lotofbench-$VERSION-sha256sums.txt"
+            echo "\`\`\`"
+            echo
+            echo "Built from commit $COMMIT. Every target compiles with \`-ffp-contract=off\` (bit-exact golden verification, see the README). Published by the release pipeline only after a green unit-test gate on the source twin (gitea: cloud-mercato/lotofbench)."
+          } > /tmp/notes.md
+          gh release create "$TAG" out/lotofbench-* \
+            --title "LotofBench $VERSION" \
+            --notes-file /tmp/notes.md
