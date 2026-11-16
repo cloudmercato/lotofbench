@@ -17,7 +17,8 @@
  *                              progress on stderr) then
  *                              POST <base>/submit/ with
  *                              {"session_id","nonce","signature",
- *                              "document"} → 201 {"id","status"}
+ *                              "document"} → 201 {"id","status",
+ *                              "result_url"}
  *
  * upload_submit() is the one-shot composition of both phases (fine
  * for short documents, impossible for real runs because the age
@@ -60,7 +61,8 @@ typedef struct {
 typedef struct {
     unsigned long long result_id;
     char status[16];
-    char result_url[UPLOAD_RESULT_URL_MAX]; /* site/result/<id>/ */
+    char result_url[UPLOAD_RESULT_URL_MAX]; /* portal result_url, else
+                                             * site/result/<id>/ */
     char reason[UPLOAD_REASON_MAX];         /* rejection / diagnostic */
 } upload_result;
 
@@ -92,9 +94,12 @@ int upload_build_payload(char *buf, size_t cap, const char *session_id,
                          const char *nonce, const char *signature,
                          const char *doc, size_t doc_len);
 
-/* Parse the 201 submit response and build the human-facing result URL
- * from the API base (a trailing "/api/v1/" is stripped to reach the
- * site root, then "/result/<id>/"). 0 on success, -1 otherwise. */
+/* Parse the 201 submit response and build the human-facing result
+ * URL: the portal-provided `result_url` — site-relative paths joined
+ * to the site root (trailing "/api/v1/" stripped from the API base),
+ * absolute URLs kept as-is — with the legacy site "/result/<id>/"
+ * fallback when the body carries no usable value (older portals).
+ * 0 on success, -1 otherwise. */
 int upload_parse_submit_response(const char *body, const char *base_url,
                                  upload_result *out);
 

@@ -212,7 +212,11 @@ submission whose claimed runtime exceeds the session age), the passes
 run, then the portal's SHA-256 proof of work is solved (progress lines
 on stderr, never stdout) and `POST /api/v1/submit/` receives the
 schema-1 document wrapped with the session id, nonce and signature.
-The portal returns the result URL (`<site>/result/<id>/`), printed to
+The 201 submit body carries the result URL (`result_url` — the
+`/results/<aggregate-key>/` detail page once the result aggregate is
+synced, `/charts/` otherwise); the CLI prefers it and falls back to
+the legacy `<site>/result/<id>/` when talking to an older portal. The
+URL is printed to
 stdout in text mode and to stderr in `--json` mode so the machine
 stream stays pure. The base URL defaults to the production portal and
 is overridden with the `LOTOFBENCH_UPLOAD_URL` environment variable
