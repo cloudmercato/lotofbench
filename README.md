@@ -124,7 +124,35 @@ or `make` (same flags, tracked by the Makefile). No external library, any
 C11 compiler, Linux/macOS/BSD. `-ffp-contract=off` is mandatory: without
 it a compiler may contract float operations into FMAs and the bit-exact
 verification of the timed cycles aborts the run instead of scoring it
-(docs/benchmarks.md, "Workload 4").
+(docs/benchmarks.md, "Workload 4"). This default build never opens a
+network socket: `--upload` is refused (exit 2), `--no-upload` is the
+default.
+
+A second, opt-in build adds the portal upload: libcurl (for HTTPS to the
+LotofBench ingest portal), everything else identical.
+
+```sh
+make WITH_CURL=1
+```
+
+`WITH_CURL=1` compiles the same sources with `-DHAVE_CURL` and links
+`-lcurl`; the upload then defaults to on (`--no-upload` turns it off).
+The shipped Docker image below is built this way; outside the container
+the default stays the zero-dependency build.
+
+### Docker
+
+```sh
+docker build -t lotofbench .
+docker run --rm lotofbench --runs 5
+```
+
+The image is a two-stage build: an Alpine 3.20 stage compiles a fully
+static musl binary (`-ffp-contract=off`, `WITH_CURL=1`) and a
+`FROM scratch` stage ships the binary plus the CA bundle, so the
+`docker run` default is the upload-enabled benchmark with no runtime
+dependencies. The nightly pipeline publishes the same image (amd64 +
+arm64) to the internal registry (docs/release.md).
 
 ## Releases (prebuilt binaries)
 
@@ -162,7 +190,7 @@ Pipeline, gate mechanism and release runbook: [docs/release.md](docs/release.md)
 
 ```sh
 ./lotofbench [--size-mb N] [--runs N] [--threads N] [--seed N] \
-             [--json] [--json-out PATH] [--no-upload]
+             [--json] [--json-out PATH] [--upload | --no-upload]
 ```
 
 Defaults: 100 MB corpus, 5 runs (median), one thread per online CPU.
@@ -172,10 +200,23 @@ array). `--json-out PATH` additionally stores that JSON document in a
 file while the usual text report goes to stdout. `--size-mb` sizes the
 File Compression corpus; every other workload uses fixed-size inputs
 (the map is the map, the pages are the pages) that vary only with
-`--seed`. `--no-upload` is accepted and does nothing: this binary never
-uploads results anywhere (the CloudBeast play that drives it posts them
-to the platform itself), the flag only keeps the play's invocation
-valid.
+`--seed`.
+
+**Portal upload.** With libcurl (the Docker image, or `make
+WITH_CURL=1`) the result document is submitted to the LotofBench ingest
+portal by default — `--no-upload` turns the flow off entirely (no
+session request, no socket). The flow is phased to satisfy the
+portal's anti-cheat cross-checks: the single-use session is requested
+`POST /api/v1/session/` **before** the passes run (the portal rejects a
+submission whose claimed runtime exceeds the session age), the passes
+run, then the portal's SHA-256 proof of work is solved (progress lines
+on stderr, never stdout) and `POST /api/v1/submit/` receives the
+schema-1 document wrapped with the session id, nonce and signature.
+The portal returns the result URL (`<site>/result/<id>/`), printed to
+stdout in text mode and to stderr in `--json` mode so the machine
+stream stays pure. The base URL defaults to the production portal and
+is overridden with the `LOTOFBENCH_UPLOAD_URL` environment variable
+(used by the testing environment).
 
 Every run starts with a hardware report, printed before the tests in
 text mode and embedded as a top-level `hardware` object in the JSON
@@ -186,6 +227,17 @@ total/free swap, the NUMA layout (numactl-style node map), the
 binary. It works on Linux and macOS, x86 (CPUID) and ARM. Every field
 is best-effort: what a platform does not expose is skipped in text and
 `""`/`0` in JSON, and capture never fails the run.
+
+Two more additive schema-1 fields feed the portal: `runtime_seconds`,
+the wall-clock time the passes took (single plus multi-threaded,
+`CLOCK_MONOTONIC`), cross-checked server-side against the session age;
+and `system`, a minimal environment profile — OS, architecture, CPU
+model, core count, RAM and the execution environment (`container`,
+`vm` or `bare-metal`, classified via cgroup/hypervisor probes) with,
+when detected, the virtualization product (`docker`, `vmware`, …).
+The profile carries no hostname, no IP address, nothing that
+identifies a person or a specific machine — the portal needs to know
+*what kind of box* ran the suite, not *which* box.
 
 Real output of a default run on the development box (12 threads) is
 kept in [docs/sample-output.md](docs/sample-output.md), with the same

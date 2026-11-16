@@ -16,8 +16,14 @@ LDLIBS   = -lm
 # (and only it) passes WITH_CURL=1 so the registry image uploads by
 # default.
 ifeq ($(WITH_CURL),1)
-CFLAGS  += -DHAVE_CURL
-LDLIBS  += -lcurl
+# override: the appends must survive a command-line CFLAGS/LDLIBS (the
+# Dockerfile passes CFLAGS for the static link; without override the
+# -DHAVE_CURL append would silently lose the GNU-make precedence war).
+override CFLAGS  += -DHAVE_CURL
+# CURL_STATIC_LIBS: the extra -l* needed to link libcurl.a's own
+# dependency closure when the whole binary is static (-static, musl);
+# empty for normal dynamic builds (libcurl.so carries its own deps).
+override LDLIBS  += -lcurl $(CURL_STATIC_LIBS)
 endif
 
 SRC = src/main.c \
