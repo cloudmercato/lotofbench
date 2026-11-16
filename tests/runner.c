@@ -22,6 +22,11 @@ static const test_entry TESTS[] = {
     { "sha256/nist-vectors", test_sha256_nist_vectors },
     { "sha256/hex", test_sha256_hex },
     { "sha256/hmac-rfc4231", test_sha256_hmac_rfc4231 },
+    /* upload — proof of work */
+    { "pow/leading-zero-bits", test_pow_leading_zero_bits },
+    { "pow/solve-difficulty-8", test_pow_solve_small },
+    { "pow/solve-progress", test_pow_solve_progress },
+    { "pow/rejects-absurd", test_pow_rejects_absurd },
     /* lz4 */
     { "lz4/roundtrip-shapes", test_lz4_roundtrip_shapes },
     { "lz4/golden-blocks", test_lz4_golden_vectors },

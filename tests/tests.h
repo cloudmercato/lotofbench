@@ -66,6 +66,12 @@ void test_sha256_nist_vectors(void);
 void test_sha256_hex(void);
 void test_sha256_hmac_rfc4231(void);
 
+/* --- upload: proof of work ------------------------------------------------------*/
+void test_pow_leading_zero_bits(void);
+void test_pow_solve_small(void);
+void test_pow_solve_progress(void);
+void test_pow_rejects_absurd(void);
+
 /* --- lz4 -----------------------------------------------------------------------*/
 void test_lz4_roundtrip_shapes(void);
 void test_lz4_golden_vectors(void);
