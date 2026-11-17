@@ -62,7 +62,7 @@ structural guarantee that the trigger chain starts at Gitea.
 Makefile appends it unconditionally (`FPC = -ffp-contract=off` in the compile
 rule) — even when `CFLAGS` is overridden on the command line. Every binary
 therefore satisfies the bit-exact golden-verification requirement; without it
-a run aborts instead of scoring (README "Build", docs/benchmarks.md).
+a run aborts instead of scoring (docs/build.md, docs/benchmarks.md).
 
 Each matrix job smoke-runs its own binary with
 `--size-mb 8 --runs 1 --threads 1` (in the same Alpine container for Linux
@@ -82,13 +82,13 @@ finds. Each archive therefore contains exactly one member — the executable
 D2 release-asset gap, kanban `t_997f6fff`/`t_e9c64ddd`: fix the artifact,
 not the deployed playbooks).
 
-```
-lotofbench-linux-x86_64.tar.gz
-lotofbench-linux-aarch64.tar.gz
-lotofbench-macos-x86_64.tar.gz
-lotofbench-macos-arm64.tar.gz
-lotofbench-<version>-sha256sums.txt
-```
+| Asset | Platform |
+|---|---|
+| `lotofbench-linux-x86_64.tar.gz` | Linux x86_64 — static (Alpine/musl), portal upload enabled |
+| `lotofbench-linux-aarch64.tar.gz` | Linux aarch64 — static (Alpine/musl), portal upload enabled |
+| `lotofbench-macos-x86_64.tar.gz` | macOS Intel (cross-built on macos-15) — system libcurl |
+| `lotofbench-macos-arm64.tar.gz` | macOS Apple silicon — system libcurl |
+| `lotofbench-<version>-sha256sums.txt` | SHA-256 of the four archives |
 
 Archive names carry no version — the tag does. That makes
 `releases/latest/download/lotofbench-linux-x86_64.tar.gz` a stable
@@ -121,6 +121,26 @@ versioned binaries — `lotofbench-<version>-linux-amd64`,
 naked ELF; rescue fell back to a source build — Grace's D2 finding,
 2026-11-16). v1.1.0 assets stay in place untouched; the archive contract
 starts at v1.2.0.
+
+## Downloading and verifying a release
+
+```sh
+VERSION=<version>
+curl -LO "https://github.com/cloudmercato/lotofbench/releases/download/v$VERSION/lotofbench-$VERSION-sha256sums.txt"
+sha256sum --check --ignore-missing "lotofbench-$VERSION-sha256sums.txt"
+tar -xzf lotofbench-linux-x86_64.tar.gz
+./lotofbench --version
+```
+
+`releases/latest/download/lotofbench-linux-<arch>.tar.gz` is the stable
+always-current URL; tag-pinned download URLs stay reproducible. The Linux
+binaries are statically linked against musl and libcurl (built in an Alpine
+3.20 container, the same closure as the registry image) and run on any Linux
+without runtime dependencies; the macOS binaries link the system libcurl
+(`/usr/lib/libcurl.4.dylib`, present on every macOS) and are built on
+GitHub-hosted macos-15 runners (Apple silicon natively; Intel cross-compiled
+via `-arch x86_64`). All four compile with `-ffp-contract=off`, so results
+are bit-comparable across platforms.
 
 ## Secrets (values live in Infisical, never in the repo)
 
