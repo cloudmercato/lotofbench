@@ -214,3 +214,54 @@ secret); the PAT lives in Infisical `GITHUB_TOKEN` (project
 - macOS amd64 is cross-compiled with `-arch x86_64` and smoke-executed under
   Rosetta 2; if Rosetta is ever unavailable on the runner, the step falls
   back to `file(1)` verification and says so in the log.
+
+## Release v1.2.0 — first archive-contract release (2026-11-17, kanban `t_997f6fff`)
+
+### What shipped
+
+- Tag `v1.2.0` cut on master `233c6479` (PR #31 `result_url` + PR #32
+  curl-variant tar.gz packaging + PR #33 version bump), GitHub
+  "Release build" run 43994154778 — **all six jobs green**, release
+  <https://github.com/cloudmercato/lotofbench/releases/tag/v1.2.0> with the
+  5 contract assets: `lotofbench-{linux-x86_64,linux-aarch64,macos-x86_64,macos-arm64}.tar.gz`
+  + `lotofbench-1.2.0-sha256sums.txt`.
+- Asset verification from the GMK: tag-pinned download URLs → HTTP 200 ×5,
+  plus the stable `releases/latest/download/lotofbench-linux-x86_64.tar.gz`
+  → 200; `sha256sum --check --ignore-missing` → 4/4 OK; every archive lists
+  exactly `lotofbench`, extracts as a regular executable file; `file(1)`:
+  2 × static musl ELF (x86-64 / aarch64, `WITH_CURL=1`), 2 × Mach-O
+  (arm64 / x86_64, dynamic SDK libcurl).
+- Released-binary proof on the GMK: JSON document reports
+  `version: 1.2.0`, 16/16 workloads on a tiny `--no-upload` run;
+  `LOTOFBENCH_UPLOAD_URL=http://127.0.0.1:9/ ./lotofbench --upload …`
+  reaches the real libcurl network layer on both released linux binaries
+  (amd64 natively, aarch64 under QEMU) — upload flow compiled in, zero
+  portal contact.
+- macOS curl build confirmed on runners: both macos-15 jobs compiled
+  `WITH_CURL=1` against the SDK libcurl and smokes passed (Rosetta smoke
+  executed the x86_64 binary).
+- Pre-CI local verification (GMK docker, exact workflow commands):
+  static curl builds for amd64 + arm64/`QEMU`, tiny smokes green
+  (amd64 single 487 / multi 943; arm64 emulated 106/106), `make test`
+  213/213.
+
+### Ops lessons for the next release owner
+
+- **Gitea gate is flaky under host DNS/DB pressure.** Attempts 1 and 2 of
+  the v1.2.0 gate failed WITHOUT running any job: under bursts of
+  `context deadline exceeded` on the remote Postgres (and Docker DNS
+  flakes inside the gitea container), Gitea never created the runner task
+  for the jobs — the run sits jobless, then the abandoned-job sweeper marks
+  it failed (~8–12 min). Signature in the DB: `action_run` row with
+  `status=2` but **no matching `action_task` rows** (and no
+  `actions_log/<repo>/<hash>/<task>.log.zst` file). Recovery: delete and
+  re-push the same tag (attempt 3 was green end-to-end). Don't debug the
+  workflow first — check for a task row.
+- `~/bin/lotofbench-github-sync.sh` was **recreated 2026-11-17** (joe) —
+  the original from the setup card was not found on the GMK. It reads the
+  deploy key from the gitea container at runtime and pushes
+  `refs/remotes/origin/master` to GitHub master; run it AFTER the release
+  commits are merged and BEFORE pushing the tag (the dispatched GitHub
+  workflow executes the file from GitHub's default branch). Used for
+  v1.2.0: GitHub master `81a2480` → `233c6479`, verified via the public API.
+- v1.1.0-test remains deleted; v1.1.0 (raw legacy assets) stays untouched.
