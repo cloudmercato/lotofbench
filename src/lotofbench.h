@@ -8,7 +8,7 @@
  * (section "Scoring"). One baseline per workload — LotofBench scores are
  * its own calibration and are NOT comparable with Geekbench scores. */
 
-#define LOTOFBENCH_VERSION   "1.1.0"
+#define LOTOFBENCH_VERSION   "1.2.0"
 
 /* Workload identities (human name + machine slug). */
 #define FC_WORKLOAD_NAME     "File Compression"
