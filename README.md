@@ -158,32 +158,41 @@ arm64) to the internal registry (docs/release.md).
 
 Every `vX.Y.Z` tag pushed to the source twin (the internal Gitea repo) runs
 the unit-test pipeline there first; only a **green pipeline** releases. The
-public release then appears on GitHub with four binaries and one checksum
-file:
+public release then appears on GitHub with four tar.gz archives and one
+checksum file. Each archive contains the benchmark binary as `./lotofbench`
+— the naming is the `install_lotofbench` fleet-playbook contract
+(`lotofbench-<os>-<arch>.tar.gz` under the version tag):
 
 | Asset | Platform |
 |---|---|
-| `lotofbench-<version>-linux-amd64` | Linux x86_64 — static (Alpine/musl) |
-| `lotofbench-<version>-linux-arm64` | Linux aarch64 — static (Alpine/musl) |
-| `lotofbench-<version>-macos-amd64` | macOS x86_64 |
-| `lotofbench-<version>-macos-arm64` | macOS Apple silicon |
-| `lotofbench-<version>-sha256sums.txt` | SHA-256 of the four binaries |
+| `lotofbench-linux-x86_64.tar.gz` | Linux x86_64 — static (Alpine/musl), portal upload enabled |
+| `lotofbench-linux-aarch64.tar.gz` | Linux aarch64 — static (Alpine/musl), portal upload enabled |
+| `lotofbench-macos-x86_64.tar.gz` | macOS Intel (cross-built on macos-15) — system libcurl |
+| `lotofbench-macos-arm64.tar.gz` | macOS Apple silicon — system libcurl |
+| `lotofbench-<version>-sha256sums.txt` | SHA-256 of the four archives |
 
 Download and verify:
 
 ```sh
-VERSION=<version> OS=linux ARCH=amd64
-curl -LO "https://github.com/cloudmercato/lotofbench/releases/download/v$VERSION/lotofbench-$VERSION-$OS-$ARCH"
+VERSION=<version>
 curl -LO "https://github.com/cloudmercato/lotofbench/releases/download/v$VERSION/lotofbench-$VERSION-sha256sums.txt"
 sha256sum --check --ignore-missing "lotofbench-$VERSION-sha256sums.txt"
-chmod +x "lotofbench-$VERSION-$OS-$ARCH"
+tar -xzf lotofbench-linux-x86_64.tar.gz
+./lotofbench --version
 ```
 
-The Linux binaries are statically linked against musl (built in an Alpine
-3.20 container) and run on any Linux without runtime dependencies; the
-macOS binaries are built on GitHub-hosted macos-15 runners (Apple silicon
-natively; Intel cross-compiled via `-arch x86_64`). All four compile with
+The Linux binaries are statically linked against musl and libcurl (built in
+an Alpine 3.20 container, the same closure as the registry image) and run
+on any Linux without runtime dependencies; the macOS binaries link the
+system libcurl (`/usr/lib/libcurl.4.dylib`, present on every macOS) and are
+built on GitHub-hosted macos-15 runners (Apple silicon natively; Intel
+cross-compiled via `-arch x86_64`). All four compile with
 `-ffp-contract=off`, so results are bit-comparable across platforms.
+
+Note the upload default: these binaries submit to the portal unless
+`--no-upload` is passed (the CloudBeast playbooks do). Release-v1.1.0 and
+older assets were raw versioned plain binaries under the
+`lotofbench-<version>-<os>-<arch>` naming.
 Pipeline, gate mechanism and release runbook: [docs/release.md](docs/release.md).
 
 ## Usage
