@@ -8,6 +8,16 @@ name: Release build
 # A direct tag push on GitHub builds nothing by design: the release trigger
 # always originates from Gitea (Anthony, 2026-11-16).
 #
+# Assets: the four targets ship as tar.gz archives named
+# `lotofbench-<os>-<arch>.tar.gz` whose single member is the executable
+# `lotofbench`. That is the contract `install_lotofbench` (CloudBeast
+# playbook) consumes by default: get_url under the v<version> tag +
+# ansible unarchive + `find -type f -name lotofbench` (Grace's D2 finding,
+# kanban t_e9c64ddd). All binaries are built WITH_CURL=1 (portal upload):
+# the Linux ones are fully static musl builds with the same libcurl.a
+# closure as the registry Docker image, the macOS ones link the system
+# libcurl every macOS ships.
+#
 # On the Gitea twin this file is inert (Gitea never sends repository_dispatch
 # here); do not workflow_dispatch it from the Gitea web UI — the preflight
 # job will refuse. Mechanism and evidence: docs/release.md.
@@ -66,10 +76,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: linux-amd64, runs_on: ubuntu-24.04, platform: linux/amd64, builder: container }
-          - { target: linux-arm64, runs_on: ubuntu-24.04, platform: linux/arm64, builder: container }
-          - { target: macos-arm64, runs_on: macos-15, platform: '', builder: native, arch: '' }
-          - { target: macos-amd64, runs_on: macos-15, platform: '', builder: native, arch: '-arch x86_64' }
+          # `target` keys the artifact/concurrency plumbing; `asset` is the
+          # os-arch part of the published archive name (the playbook
+          # contract uses uname arch spellings: x86_64 / aarch64).
+          - { target: linux-amd64, runs_on: ubuntu-24.04, platform: linux/amd64, builder: container, asset: linux-x86_64 }
+          - { target: linux-arm64, runs_on: ubuntu-24.04, platform: linux/arm64, builder: container, asset: linux-aarch64 }
+          - { target: macos-arm64, runs_on: macos-15, platform: '', builder: native, arch: '', asset: macos-arm64 }
+          - { target: macos-amd64, runs_on: macos-15, platform: '', builder: native, arch: '-arch x86_64', asset: macos-x86_64 }
     steps:
       - name: Checkout the release tag
         uses: actions/checkout@v4
@@ -92,41 +105,52 @@ jobs:
         if: matrix.target == 'linux-arm64'
         uses: docker/setup-qemu-action@v3
 
-      - name: Build (linux — alpine/musl, static; FPC comes from the Makefile)
+      - name: Build (linux — alpine/musl, fully static, WITH_CURL portal upload)
         if: matrix.builder == 'container'
         run: |
           set -euo pipefail
+          # Package list and CURL_STATIC_LIBS mirror the repo Dockerfile's
+          # build stage: the released linux archives and the registry image
+          # must be the same artifact (static musl binary + libcurl.a).
           docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src alpine:3.20 sh -c '
-            apk add --no-cache build-base >/dev/null &&
-            make CC=gcc CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic -static" lotofbench'
+            apk add --no-cache build-base \
+                curl-dev curl-static \
+                nghttp2-static brotli-static zstd-static libssh2-static \
+                zlib-static openssl-libs-static \
+                libidn2-static libunistring-static libpsl-static \
+                c-ares-static gettext-static \
+                ca-certificates >/dev/null &&
+            make CC=gcc WITH_CURL=1 \
+                CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic -static" \
+                CURL_STATIC_LIBS="-lssl -lcrypto -lnghttp2 \
+                                  -lbrotlidec -lbrotlienc -lbrotlicommon \
+                                  -lzstd -lssh2 -lz \
+                                  -lidn2 -lunistring -lpsl -lcares" \
+                lotofbench'
 
-      - name: Build (macOS — clang on the hosted arm64 runner)
+      - name: Build (macOS — clang on the hosted arm64 runner, WITH_CURL via SDK libcurl)
         if: matrix.builder == 'native'
         run: |
           set -euo pipefail
-          make CC=clang CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic ${{ matrix.arch }}" lotofbench
-
-      - name: Stage release asset
-        id: stage
-        run: |
-          set -euo pipefail
-          VERSION="${TAG#v}"
-          ASSET="lotofbench-${VERSION}-${{ matrix.target }}"
-          mkdir -p out
-          cp lotofbench "out/$ASSET"
-          file "out/$ASSET"
-          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
+          # The macOS SDK ships <curl/curl.h> and the libcurl.4 tbd stub;
+          # the link stays dynamic against /usr/lib/libcurl.4.dylib, which
+          # every macOS carries — no Homebrew, no rpath games for a
+          # released binary. FPC comes from the Makefile.
+          make CC=clang WITH_CURL=1 \
+              CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic ${{ matrix.arch }}" lotofbench
 
       - name: Smoke — full suite, tiny corpus (--size-mb 8 --runs 1 --threads 1)
         if: matrix.arch == ''
         run: |
           set -euo pipefail
-          ASSET="${{ steps.stage.outputs.asset }}"
+          # --no-upload is explicit: a curl build uploads by default
+          # (UPLOAD_DEFAULT_ENABLED=1) and a bare smoke must not open a
+          # real portal session from the runner.
           if [ "${{ matrix.builder }}" = "container" ]; then
-            docker run --rm --platform ${{ matrix.platform }} -v "$PWD/out":/out alpine:3.20 \
-              "/out/$ASSET" --size-mb 8 --runs 1 --threads 1
+            docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src alpine:3.20 \
+              ./lotofbench --size-mb 8 --runs 1 --threads 1 --no-upload
           else
-            "./out/$ASSET" --size-mb 8 --runs 1 --threads 1
+            ./lotofbench --size-mb 8 --runs 1 --threads 1 --no-upload
           fi
 
       # Cross-compiled x86_64 cannot run natively on the arm64 runner: try
@@ -138,14 +162,33 @@ jobs:
         if: matrix.target == 'macos-amd64'
         run: |
           set -euo pipefail
-          ASSET="${{ steps.stage.outputs.asset }}"
-          file "out/$ASSET"
+          file lotofbench
           if softwareupdate --install-rosetta --agree-to-license >/dev/null 2>&1 \
-             && arch -x86_64 "out/$ASSET" --size-mb 8 --runs 1 --threads 1; then
+             && arch -x86_64 ./lotofbench --size-mb 8 --runs 1 --threads 1 --no-upload; then
             echo "Rosetta smoke: executed x86_64 binary successfully"
           else
-            echo "NOTE: Rosetta smoke unavailable on this runner — asset verified with file(1) only; results equality is guaranteed by -ffp-contract=off and the source golden tests."
+            echo "NOTE: Rosetta smoke unavailable on this runner — binary verified with file(1) only; results equality is guaranteed by -ffp-contract=off and the source golden tests."
           fi
+
+      - name: Stage release asset (tar.gz — the install_lotofbench fleet contract)
+        id: stage
+        run: |
+          set -euo pipefail
+          ASSET="lotofbench-${{ matrix.asset }}.tar.gz"
+          mkdir -p out
+          tar -czf "out/$ASSET" lotofbench
+          # Prove the archive satisfies the consumer contract: a regular
+          # executable file named `lotofbench` (install_lotofbench
+          # unarchives to a directory, then `find -type f -name lotofbench
+          # | head -1` and symlinks it).
+          CHECKDIR=$(mktemp -d)
+          tar -xzf "out/$ASSET" -C "$CHECKDIR"
+          test -f "$CHECKDIR/lotofbench"
+          test -x "$CHECKDIR/lotofbench"
+          file "$CHECKDIR/lotofbench"
+          rm -rf "$CHECKDIR"
+          ls -l out/
+          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -176,17 +219,13 @@ jobs:
           path: out
           merge-multiple: true
 
-      - name: Generate sha256sums (4 binaries)
+      - name: Generate sha256sums (4 archives)
         run: |
           set -euo pipefail
           VERSION="${TAG#v}"
           ls -l out/
           cd out
-          sha256sum "lotofbench-$VERSION-linux-amd64" \
-                    "lotofbench-$VERSION-linux-arm64" \
-                    "lotofbench-$VERSION-macos-amd64" \
-                    "lotofbench-$VERSION-macos-arm64" \
-                    > "lotofbench-$VERSION-sha256sums.txt"
+          sha256sum lotofbench-*.tar.gz > "lotofbench-$VERSION-sha256sums.txt"
           cat "lotofbench-$VERSION-sha256sums.txt"
 
       - name: Create the GitHub release
@@ -195,24 +234,30 @@ jobs:
           VERSION="${TAG#v}"
           COMMIT="$(git rev-parse HEAD)"
           {
-            echo "LotofBench $VERSION — prebuilt binaries for four targets."
+            echo "LotofBench $VERSION — prebuilt binaries for four targets, packaged as tar.gz archives."
+            echo
+            echo "Each archive contains the benchmark binary as \`./lotofbench\`; the checksum file covers the four archives."
             echo
             echo "| Asset | Platform |"
             echo "|---|---|"
-            echo "| \`lotofbench-$VERSION-linux-amd64\` | Linux x86_64 — static (Alpine/musl) |"
-            echo "| \`lotofbench-$VERSION-linux-arm64\` | Linux aarch64 — static (Alpine/musl) |"
-            echo "| \`lotofbench-$VERSION-macos-amd64\` | macOS x86_64 (cross-built on macos-15) |"
-            echo "| \`lotofbench-$VERSION-macos-arm64\` | macOS Apple silicon (built on macos-15) |"
+            echo "| \`lotofbench-linux-x86_64.tar.gz\` | Linux x86_64 — static musl, portal upload enabled |"
+            echo "| \`lotofbench-linux-aarch64.tar.gz\` | Linux aarch64 — static musl, portal upload enabled |"
+            echo "| \`lotofbench-macos-x86_64.tar.gz\` | macOS Intel (cross-built on macos-15) — system libcurl |"
+            echo "| \`lotofbench-macos-arm64.tar.gz\` | macOS Apple silicon (built on macos-15) — system libcurl |"
             echo
-            echo "Verify the download:"
+            echo "Download and verify:"
             echo
             echo "\`\`\`sh"
-            echo "curl -LO https://github.com/cloudmercato/lotofbench/releases/download/$TAG/lotofbench-$VERSION-sha256sums.txt"
+            echo "VERSION=$VERSION"
+            echo "curl -LO \"https://github.com/cloudmercato/lotofbench/releases/download/$TAG/lotofbench-$VERSION-sha256sums.txt\""
             echo "sha256sum --check --ignore-missing lotofbench-$VERSION-sha256sums.txt"
+            echo "tar -xzf lotofbench-linux-x86_64.tar.gz && ./lotofbench --version"
             echo "\`\`\`"
             echo
-            echo "Built from commit $COMMIT. Every target compiles with \`-ffp-contract=off\` (bit-exact golden verification, see the README). Published by the release pipeline only after a green unit-test gate on the source twin (gitea: cloud-mercato/lotofbench)."
+            echo "The asset naming follows the \`install_lotofbench\` playbook contract (\`lotofbench-<os>-<arch>.tar.gz\` under the \`v<version>\` tag, binary member \`lotofbench\`): a fleet suite installs this release with \`lotofbench_version: $VERSION\` and no URL override."
+            echo
+            echo "Built from commit $COMMIT. Every target compiles with \`-ffp-contract=off\` (bit-exact golden verification, see the README); the Linux binaries are fully static musl builds with \`WITH_CURL=1\` — the same closure as the registry image — and the macOS ones link the system libcurl. Note the upload default: a curl build submits to the portal unless \`--no-upload\` is passed. Published by the release pipeline only after a green unit-test gate on the source twin (gitea: cloud-mercato/lotofbench)."
           } > /tmp/notes.md
-          gh release create "$TAG" out/lotofbench-* \
+          gh release create "$TAG" out/lotofbench-*.tar.gz out/lotofbench-"$VERSION"-sha256sums.txt \
             --title "LotofBench $VERSION" \
             --notes-file /tmp/notes.md

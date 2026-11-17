@@ -22,7 +22,7 @@ prebuilt binaries. Written 2026-11-16 (setup + first rehearsal, kanban card
  ┌───────────────────────────────────────────────────────────────┐
  │ GitHub: cloudmercato/lotofbench        (public face)          │
  │ .github/workflows/release.yml — "Release build"               │
- │   build matrix (4 targets) → sha256sums → GitHub Release      │
+ │   build matrix (4 tar.gz archives) → sha256sums → GitHub Release │
  └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -43,7 +43,7 @@ tag-push trigger and its preflight job refuses anything that is not a
 | File | Repo | Triggers | What it does |
 |---|---|---|---|
 | `.gitea/workflows/release.yml` | Gitea | push of `v*` tag, workflow_dispatch | Gate: `make test` → mirror tag → `repository_dispatch`. `concurrency: release-gate` (single slot). |
-| `.github/workflows/release.yml` | GitHub | `repository_dispatch` type `release-build`, workflow_dispatch (input `tag`) | Build 4 targets → `sha256sums` → `gh release create`. `concurrency` keyed per tag. |
+| `.github/workflows/release.yml` | GitHub | `repository_dispatch` type `release-build`, workflow_dispatch (input `tag`) | Build 4 tar.gz archives → `sha256sums` → `gh release create`. `concurrency` keyed per tag. |
 | `.gitea/workflows/tests.yml` | Gitea | every push / PR | Existing unit-test pipeline (the same `make test` the gate runs). |
 
 The GitHub workflow **never** runs on a GitHub tag push — that is the
@@ -53,10 +53,10 @@ structural guarantee that the trigger chain starts at Gitea.
 
 | Target | Where | Toolchain | Notes |
 |---|---|---|---|
-| `linux-amd64` | `ubuntu-24.04` hosted runner, `alpine:3.20` container (native) | gcc (musl), `CFLAGS=-O2 -std=c11 -Wall -Wextra -pedantic -static` | fully static musl binary |
-| `linux-arm64` | same, `docker run --platform linux/arm64` via QEMU (`docker/setup-qemu-action`) | same | fully static musl binary, smoke-run under emulation |
-| `macos-arm64` | `macos-15` hosted runner (Apple silicon) | clang, default `CFLAGS` | native, full smoke |
-| `macos-amd64` | `macos-15` hosted runner (Apple silicon) | clang, `CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic -arch x86_64"` | cross-compiled; Rosetta smoke when available, else file(1) verification (documented in the run log) |
+| `linux-amd64` | `ubuntu-24.04` hosted runner, `alpine:3.20` container (native) | gcc (musl), `WITH_CURL=1`, `CFLAGS=-O2 -std=c11 -Wall -Wextra -pedantic -static` + `CURL_STATIC_LIBS` | fully static musl binary with the portal-upload flow; package list and static-lib closure mirror the repo Dockerfile build stage |
+| `linux-arm64` | same, `docker run --platform linux/arm64` via QEMU (`docker/setup-qemu-action`) | same | fully static musl binary with the portal-upload flow, smoke-run under emulation |
+| `macos-arm64` | `macos-15` hosted runner (Apple silicon) | clang, default `CFLAGS`, `WITH_CURL=1` | native, full smoke; links the SDK libcurl dynamically (`/usr/lib/libcurl.4.dylib`, present on every macOS) |
+| `macos-amd64` | `macos-15` hosted runner (Apple silicon) | clang, `CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic -arch x86_64"`, `WITH_CURL=1` | cross-compiled; Rosetta smoke when available, else file(1) verification (documented in the run log); same dynamic system-libcurl link |
 
 `-ffp-contract=off` is **not** spelled out in the workflow steps because the
 Makefile appends it unconditionally (`FPC = -ffp-contract=off` in the compile
@@ -71,25 +71,56 @@ is uploaded. A build that cannot execute aborts before reaching the release.
 
 ## Asset name contract
 
-Stable, automation-friendly, no archives — the playbook and scripts download
-and `chmod +x` directly:
+**tar.gz archives named after the `install_lotofbench` playbook contract**
+(CloudBeast `cs_web/player/playbooks/install_lotofbench.yml`): the playbook
+downloads `lotofbench-linux-<arch>.tar.gz` under the `v<version>` tag
+(`<arch>` = `x86_64` or `aarch64`, from `ansible_architecture`), runs
+`unarchive`, then symlinks the first regular file named `lotofbench` it
+finds. Each archive therefore contains exactly one member — the executable
+`./lotofbench` — and the fleet installs a release with
+`lotofbench_version: <version>` and **no URL override** (remedy (a) of the
+D2 release-asset gap, kanban `t_997f6fff`/`t_e9c64ddd`: fix the artifact,
+not the deployed playbooks).
 
 ```
-lotofbench-<version>-linux-amd64
-lotofbench-<version>-linux-arm64
-lotofbench-<version>-macos-amd64
-lotofbench-<version>-macos-arm64
+lotofbench-linux-x86_64.tar.gz
+lotofbench-linux-aarch64.tar.gz
+lotofbench-macos-x86_64.tar.gz
+lotofbench-macos-arm64.tar.gz
 lotofbench-<version>-sha256sums.txt
 ```
 
-`<version>` = tag without the leading `v` (e.g. tag `v1.2.3` → version
-`1.2.3`). The `sha256sums.txt` covers exactly the four binaries and is
-generated in one place (the release job) from the downloaded artifacts, so
-the checksums always describe the attached files. Stable download URL:
+Archive names carry no version — the tag does. That makes
+`releases/latest/download/lotofbench-linux-x86_64.tar.gz` a stable
+always-current URL, while tag-pinned URLs stay reproducible. The macOS
+archives follow the same os-arch spelling (`macos-x86_64`, `macos-arm64`)
+for uniformity; no fleet automation consumes them. The
+`lotofbench-<version>-sha256sums.txt` name keeps the version because it is
+the one file referenced by name in the release notes' verification snippet;
+it covers exactly the four archives and is generated in one place (the
+release job) from the downloaded artifacts, so the checksums always
+describe the attached files. Stable download URLs:
 
 ```
-https://github.com/cloudmercato/lotofbench/releases/download/v<version>/lotofbench-<version>-<os>-<arch>
+https://github.com/cloudmercato/lotofbench/releases/download/v<version>/lotofbench-<os>-<arch>.tar.gz
+https://github.com/cloudmercato/lotofbench/releases/latest/download/lotofbench-linux-<arch>.tar.gz
 ```
+
+**Behavior note**: every released binary is built `WITH_CURL=1` — the Linux
+ones are fully static musl builds with the same libcurl closure as the
+registry image, the macOS ones link the system libcurl. A curl build
+uploads by default (`UPLOAD_DEFAULT_ENABLED=1`): scripts that must stay
+offline pass `--no-upload` (the CloudBeast `run_lotofbench` playbook
+already does).
+
+**Legacy contract (until v1.1.0 included)**: releases shipped raw
+versioned binaries — `lotofbench-<version>-linux-amd64`,
+`lotofbench-<version>-linux-arm64`, `lotofbench-<version>-macos-amd64`,
+`lotofbench-<version>-macos-arm64` — plain (no curl) builds that
+`install_lotofbench` could not consume (`get_url`+`unarchive` rejects a
+naked ELF; rescue fell back to a source build — Grace's D2 finding,
+2026-11-16). v1.1.0 assets stay in place untouched; the archive contract
+starts at v1.2.0.
 
 ## Secrets (values live in Infisical, never in the repo)
 
