@@ -167,6 +167,21 @@ git tag v1.2.3 && git push origin v1.2.3
 Then watch the "Release gate" run on Gitea; on green, the "Release build" run
 starts on GitHub and the release appears with 5 assets.
 
+**Publish the Docker Hub release image** (after the GitHub release is out,
+from a merged master checkout on the GMK):
+
+```sh
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t "cloudmercato/lotofbench:<version>" -t cloudmercato/lotofbench:latest \
+  --provenance=false --sbom=false --push .
+```
+
+Credentials: `docker login -u zulupro` with the Infisical
+`DOCKERHUB_TOKEN` (org-admin PAT on the `cloudmercato` repo). The image
+must exist on Docker Hub before the release is announced — v1.2.0 was
+published right after its release (PR #36 Dockerfile, Alpine 3.24
+stripped ~8 MB image).
+
 **Re-run a failed gate after a fix** — push a new tag (recommended), or
 dispatch the gate workflow manually from the Gitea UI to re-test the same
 commit. Note: a manual dispatch only runs the tests job — the publish job's
