@@ -19,7 +19,7 @@ calibration and are *not* comparable with Geekbench scores.
 
 ## Install
 
-Two ways to get a `lotofbench` binary.
+Three ways to get a `lotofbench` binary.
 
 ### Use release
 
@@ -29,6 +29,21 @@ page: four of them (Linux x86_64 and aarch64 — fully static, portal
 upload enabled; macOS Intel and Apple silicon — system libcurl) plus
 one SHA-256 checksum file. Download, verify and unpack them following
 [docs/release.md](docs/release.md).
+
+### Use Docker
+
+The registry image runs the benchmark with zero host dependencies: a
+`FROM scratch` runtime shipping the static, upload-enabled binary and
+its TLS trust store (~8 MB, multi-arch linux/amd64 + linux/arm64) on
+[Docker Hub](https://hub.docker.com/r/cloudmercato/lotofbench):
+
+```sh
+docker run --rm cloudmercato/lotofbench:1.2.0 --size-mb 64 --runs 5
+```
+
+The image uploads to the portal by default; pass `--no-upload` for
+offline runs. Each release is tagged (`1.2.0`, …) and `latest` follows
+master; details in [docs/build.md](docs/build.md).
 
 ### Compile
 

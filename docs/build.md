@@ -40,9 +40,19 @@ docker build -t lotofbench .
 docker run --rm lotofbench --runs 5
 ```
 
-The image is a two-stage build: an Alpine 3.20 stage compiles a fully
-static musl binary (`-ffp-contract=off`, `WITH_CURL=1`) and a
-`FROM scratch` stage ships the binary plus the CA bundle, so the
-`docker run` default is the upload-enabled benchmark with no runtime
-dependencies. The nightly pipeline publishes the same image (amd64 +
-arm64) to the internal registry ([docs/release.md](release.md)).
+`--json-out` must point at a mounted volume (`-v "$PWD":/out … /out/x.json`):
+the `FROM scratch` runtime has no writable paths — not even `/tmp`.
+
+The image is a two-stage build: an Alpine 3.24 stage compiles a fully
+static musl binary (`-ffp-contract=off`, `WITH_CURL=1`, stripped to
+~8 MB) and a `FROM scratch` stage ships the binary plus the CA bundle,
+so the `docker run` default is the upload-enabled benchmark with no
+runtime dependencies. Multi-arch: linux/amd64 + linux/arm64.
+
+Release images are published to Docker Hub as
+`cloudmercato/lotofbench:<version>` (e.g. `1.2.0`) plus a rolling
+`latest` tag; the nightly pipeline publishes the same image (amd64 +
+arm64) to the internal registry ([docs/release.md](release.md)). The
+build stage mirrors the release workflow's Linux toolchain (Alpine
+3.24, where c-ares ships its static archive in `c-ares-dev` instead of
+the old `c-ares-static` split).
