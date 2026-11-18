@@ -112,13 +112,13 @@ jobs:
           # Package list and CURL_STATIC_LIBS mirror the repo Dockerfile's
           # build stage: the released linux archives and the registry image
           # must be the same artifact (static musl binary + libcurl.a).
-          docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src alpine:3.20 sh -c '
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src alpine:3.24 sh -c '
             apk add --no-cache build-base \
                 curl-dev curl-static \
                 nghttp2-static brotli-static zstd-static libssh2-static \
                 zlib-static openssl-libs-static \
                 libidn2-static libunistring-static libpsl-static \
-                c-ares-static gettext-static \
+                c-ares-dev gettext-static \
                 ca-certificates >/dev/null &&
             make CC=gcc WITH_CURL=1 \
                 CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic -static" \
@@ -126,7 +126,7 @@ jobs:
                                   -lbrotlidec -lbrotlienc -lbrotlicommon \
                                   -lzstd -lssh2 -lz \
                                   -lidn2 -lunistring -lpsl -lcares" \
-                lotofbench'
+                lotofbench && strip lotofbench'
 
       - name: Build (macOS — clang on the hosted arm64 runner, WITH_CURL via SDK libcurl)
         if: matrix.builder == 'native'
@@ -147,7 +147,7 @@ jobs:
           # (UPLOAD_DEFAULT_ENABLED=1) and a bare smoke must not open a
           # real portal session from the runner.
           if [ "${{ matrix.builder }}" = "container" ]; then
-            docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src alpine:3.20 \
+            docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src alpine:3.24 \
               ./lotofbench --size-mb 8 --runs 1 --threads 1 --no-upload
           else
             ./lotofbench --size-mb 8 --runs 1 --threads 1 --no-upload

@@ -53,7 +53,7 @@ structural guarantee that the trigger chain starts at Gitea.
 
 | Target | Where | Toolchain | Notes |
 |---|---|---|---|
-| `linux-amd64` | `ubuntu-24.04` hosted runner, `alpine:3.20` container (native) | gcc (musl), `WITH_CURL=1`, `CFLAGS=-O2 -std=c11 -Wall -Wextra -pedantic -static` + `CURL_STATIC_LIBS` | fully static musl binary with the portal-upload flow; package list and static-lib closure mirror the repo Dockerfile build stage |
+| `linux-amd64` | `ubuntu-24.04` hosted runner, `alpine:3.24` container (native) | gcc (musl), `WITH_CURL=1`, `CFLAGS=-O2 -std=c11 -Wall -Wextra -pedantic -static` + `CURL_STATIC_LIBS` | fully static musl binary with the portal-upload flow; package list and static-lib closure mirror the repo Dockerfile build stage |
 | `linux-arm64` | same, `docker run --platform linux/arm64` via QEMU (`docker/setup-qemu-action`) | same | fully static musl binary with the portal-upload flow, smoke-run under emulation |
 | `macos-arm64` | `macos-15` hosted runner (Apple silicon) | clang, default `CFLAGS`, `WITH_CURL=1` | native, full smoke; links the SDK libcurl dynamically (`/usr/lib/libcurl.4.dylib`, present on every macOS) |
 | `macos-amd64` | `macos-15` hosted runner (Apple silicon) | clang, `CFLAGS="-O2 -std=c11 -Wall -Wextra -pedantic -arch x86_64"`, `WITH_CURL=1` | cross-compiled; Rosetta smoke when available, else file(1) verification (documented in the run log); same dynamic system-libcurl link |
@@ -134,8 +134,8 @@ tar -xzf lotofbench-linux-x86_64.tar.gz
 
 `releases/latest/download/lotofbench-linux-<arch>.tar.gz` is the stable
 always-current URL; tag-pinned download URLs stay reproducible. The Linux
-binaries are statically linked against musl and libcurl (built in an Alpine
-3.20 container, the same closure as the registry image) and run on any Linux
+binaries are statically linked against musl and libcurl (built in an Alpine 3.24
+container, the same closure as the registry image) and run on any Linux
 without runtime dependencies; the macOS binaries link the system libcurl
 (`/usr/lib/libcurl.4.dylib`, present on every macOS) and are built on
 GitHub-hosted macos-15 runners (Apple silicon natively; Intel cross-compiled

@@ -4,14 +4,16 @@
 # The registry image is the curl build (WITH_CURL=1): it uploads by
 # default, exactly the documented difference with the zero-dependency
 # one-liner of the README, which stays offline-capable without libcurl.
-FROM alpine:3.20 AS build
+FROM alpine:3.24 AS build
+# Alpine 3.24: c-ares no longer splits a -static package — its static
+# archive ships in c-ares-dev (still linked via -lcares in the closure).
 RUN apk add --no-cache \
         build-base \
         curl-dev curl-static \
         nghttp2-static brotli-static zstd-static libssh2-static \
         zlib-static openssl-libs-static \
         libidn2-static libunistring-static libpsl-static \
-        c-ares-static gettext-static \
+        c-ares-dev gettext-static \
         ca-certificates
 WORKDIR /src
 COPY Makefile .
@@ -27,7 +29,11 @@ RUN make CC=gcc WITH_CURL=1 \
         CURL_STATIC_LIBS="-lssl -lcrypto -lnghttp2 \
                           -lbrotlidec -lbrotlienc -lbrotlicommon \
                           -lzstd -lssh2 -lz \
-                          -lidn2 -lunistring -lpsl -lcares"
+                          -lidn2 -lunistring -lpsl -lcares" \
+    && strip lotofbench
+# strip keeps the runtime image at ~8 MB (27 MB unstripped) without
+# touching the code: -ffp-contract=off and the golden tests guarantee
+# bit-exactness regardless of symbol tables.
 
 # ---- Stage 2: runtime — the lotofbench command and its TLS trust ----
 FROM scratch
